@@ -50,12 +50,15 @@ Status values: `todo`, `in-progress`, `done`, `blocked`.
 ## Last stop
 
 - When: 2026-10-18
-- Who (executor/model): Claude Opus 5.5 (E25–E31)
-- Stopped because: Redline v20261018.0 is released (github.com/c4p741nth/redline, tag v20261018.0, zip SHA-256
+- Who (executor/model): Claude Opus 5.5 (E25–E32)
+- Stopped because: Redline v20261018.0 is released (github.com/c4p741nth/redline, tag v20261018.0). The user asked
+  for E32 to replace that release rather than add a new one: the tag moved to the E32 commit and the zip was
+  replaced (SHA-256 f49c35e957d108182dfe14dd8773b0dda7d96ead1257bc16f4d4d31448ff99e2; the first upload was
   2e82acf797838fc5a327ce260c136cb7c4f2c60b4f2c95b8989d7a6b63923ae9).
 - Working tree state: everything committed and pushed; `reverse/` is local only (ignored).
 - Next step: run docs/EDITOR-MANUAL-TEST.md by ear and in osu! (Billie Jean per-beat lines and its 19 beats with two
-  attacks listed in PHASE3-STATUS, bar lines, Copy normalized in mania, the timing table, the small-window layout).
+  attacks listed in PHASE3-STATUS, bar lines, Copy normalized in mania, the timing table, the small-window layout,
+  and the E32 section: menus, shortcuts, To playhead, remembered settings).
 
 ## Final verification
 
