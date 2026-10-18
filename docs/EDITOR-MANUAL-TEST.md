@@ -106,14 +106,14 @@ proposal mapping and file writes; they do not establish audible synchronization 
 - [ ] Drag across several red lines on empty waveform space: an orange band appears, and on release they
   turn orange and get ● in the list. Shift+drag adds more; Ctrl+A selects all; Esc clears. A short click
   still seeks, and grabbing a red line still drags it.
-- [ ] With Shift scope **Selected** and three lines selected, press +¼ beat: all three move by their own
+- [ ] With three lines selected, press +¼ beat: all three move by their own
   beat, as one Ctrl+Z step. Push them into an unselected line: a status message, no edit. Delete removes
   all selected lines as one undo step.
 
 ## Phase 2: multi-BPM auto-time (M3)
 
-- [ ] Open MAMBO COMBO audio, leave the BPM box empty, press **Auto-time** (Normal). The status names the
-  sections and they are listed under the proposal buttons. Nothing in the timeline changes yet.
+- [ ] Open MAMBO COMBO audio, leave the BPM box empty, press **Auto-time** (Normal). The status gives the
+  number of red lines and their BPM range, and Apply... appears. Nothing in the timeline changes yet.
 - [ ] Press **Apply...**, confirm: every red line is replaced and the grid follows the new
   sections. **One Ctrl+Z restores the whole previous timing** (not one line at a time).
 - [ ] Repeat with a BPM typed in the box (e.g. `160`): the button refuses with a message naming the BPM box,
@@ -152,6 +152,22 @@ proposal mapping and file writes; they do not establish audible synchronization 
   waveform stays usable; after an auto-time the Apply buttons are in view without scrolling; Apply...
   asks a one-line yes/no.
 
+## E32: menu bar, toolbars, shortcuts, remembered settings
+
+- [ ] The menu bar has File, Edit, Timing, Settings and Help; Open/Save/Copy/Undo/Redo/About are no longer toolbar
+  buttons, and there is no All / Selected shift box.
+- [ ] The three toolbars (playback, Auto-time, Shift) line up: drop-downs, boxes and buttons are the same height as
+  their labels' line, with a clear gap between groups. At 900 px wide a group wraps whole onto the next line.
+- [ ] Click a row in the timing table: it is selected, the playhead (yellow) does not move. Put the playhead on a
+  hit with ←/→, press **To playhead** (or Ctrl+Shift+P): the line moves onto the playhead, one Ctrl+Z step.
+  Double-click a row: the playhead jumps there.
+- [ ] Ctrl+←/→ shift the selected lines 1 ms, Ctrl+Shift+←/→ 5 ms; M toggles the metronome, F follow, F1 lists the
+  keys; Ctrl+T runs Auto-time and Ctrl+Enter applies; Ctrl+O / Ctrl+Shift+O / Ctrl+S open and save.
+- [ ] After Auto-time no list of "1. xxx ms - xxx BPM" lines appears; the status line summarises the proposal.
+- [ ] Change both volumes, the speed, beat snap, auto-time mode, the table tab and the window size; close and
+  reopen: they are back. **Settings → Restore default settings** puts them back to 100 % / 70 %, 1.0, 1/4,
+  Normal, All, 1280×720.
+
 ## E22: short tempo steps (Snap to onsets, BPM from spacing)
 
 - [ ] Yooh - RPG, 252 s: delete the auto-time lines between 229 s and 256 s, then at 0.5x speed put a red line
@@ -167,18 +183,18 @@ proposal mapping and file writes; they do not establish audible synchronization 
 
 - [ ] Click any button or checkbox (e.g. Metronome, Copy timing points), then press Space: playback toggles and
   the clicked control is not pressed again.
-- [ ] Run Auto-time (Normal) on a long multi-BPM song: the proposal list scrolls inside a short box, and the red-line list
-  on the right keeps its height and scrolls normally. Try a small window (about 720 px high).
+- [ ] Run Auto-time (Normal) on a long multi-BPM song: the timing table on the right keeps its height and scrolls
+  normally. Try a small window (about 720 px high).
 - [ ] Play through a multi-BPM map with Follow on: each time the playhead passes a red line, that row is selected
   and scrolled into view. Paused seeks and Follow off leave the selection alone.
 
 ## E20: list jump, copy rows, ⅛ shift, song title
 
-- [ ] Click rows in the red-line list (and move with ↑/↓ in it): the playhead jumps onto each line and the
-  view shows it one third from the left; while playing, playback continues from the line.
+- [ ] Double-click rows in the timing table: the playhead jumps onto each line and the view shows it one third
+  from the left; while playing, playback continues from the line. (Since E32 a single click only selects.)
 - [ ] Copy timing points and paste into the osu! editor's timing setup: only number rows, no `[TimingPoints]`.
 - [ ] Shift −⅛ / +⅛ beat moves each red line by an eighth of its own beat, one undo step.
-- [ ] Open a .osu: the window title and the bold line on top read "Artist - Title [Difficulty] (Mapper)";
+- [ ] Open a .osu: the window title reads "Artist - Title [Difficulty] (Mapper) - Redline by C4P741N";
   open plain audio: its file name.
 
 ## Phase 1.3: BPM lock, per-section auto-time, follow and volume

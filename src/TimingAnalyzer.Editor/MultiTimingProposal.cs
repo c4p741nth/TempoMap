@@ -33,6 +33,12 @@ public sealed record MultiTimingProposal(IReadOnlyList<TimingPoint> Sections)
         return new MultiTimingProposal(points);
     }
 
+    /// <summary>The status line after Auto-time: how many red lines, over which BPMs.</summary>
+    public string Summary => "Auto-time: " + (Sections.Count == 1
+        ? "one red line, " + OsuPrecision.FormatBpm(Sections[0].Bpm) + " BPM at " + OsuPrecision.FormatTime(Sections[0].Time) + " ms."
+        : Sections.Count.ToString(Invariant) + " red lines, " + OsuPrecision.FormatBpm(Sections.Min(p => p.Bpm)) + "-" +
+          OsuPrecision.FormatBpm(Sections.Max(p => p.Bpm)) + " BPM.") + " Apply... replaces the red lines.";
+
     /// <summary>One line per section, so the user can read the proposal before replacing their timing.</summary>
     public IReadOnlyList<string> Lines => Sections
         .Select((p, i) => (i + 1).ToString(Invariant) + ". " + OsuPrecision.FormatTime(p.Time) + " ms — " +

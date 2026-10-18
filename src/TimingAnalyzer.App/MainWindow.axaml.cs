@@ -16,6 +16,9 @@ public partial class MainWindow : Window
 {
     private readonly EditorViewModel model;
     private bool closed;
+    /// <summary>Where settings are kept; a test harness points it elsewhere before opening a window.</summary>
+    public static string SettingsPath { get; set; } = EditorSettings.DefaultPath;
+    private Size normalSize = new(1280, 720);
     public MainWindow()
     {
         InitializeComponent();
@@ -25,6 +28,10 @@ public partial class MainWindow : Window
             return AudioContent.Create(decoded.Mono, checked((int)decoded.Rate));
         }), path => new PlaybackEngine(path));
         DataContext = model;
+        ApplySettings(EditorSettings.Load(SettingsPath));
+        // The size to remember is the last one the window had before it was maximised.
+        SizeChanged += (_, e) => { if (WindowState == WindowState.Normal) normalSize = e.NewSize; };
+        Closing += (_, _) => SaveSettings();
         // Avalonia 12 TopLevel.RequestAnimationFrame(Action<TimeSpan>), verified in cached XML.
         Opened += (_, _) => RequestAnimationFrame(UpdateFrame);
         Closed += (_, _) => { closed = true; model.Dispose(); };
@@ -65,8 +72,37 @@ public partial class MainWindow : Window
         syncingTable = true;
         try { model.SelectRows(reds, primary); }
         finally { syncingTable = false; }
-        // A plain click (one row) jumps there, as osu!'s list does; Ctrl / Shift clicks only select.
-        if (rows.Count == 1 && e.AddedItems.Count == 1) model.JumpTo(rows[0].Point.Time);
+        // A click only selects: the playhead stays where it is, so a line can be shifted onto it (To playhead).
+    }
+    /// <summary>A double-click on a row jumps there.</summary>
+    private void TableDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if ((e.Source as Visual)?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault()?.DataContext is TimingRow row)
+            model.JumpTo(row.Point.Time);
+    }
+    private void SelectAllRows(object? sender, RoutedEventArgs e) => TimingTable.SelectAll();
+    private void ExitApp(object? sender, RoutedEventArgs e) => Close();
+    private async void ShowKeys(object? sender, RoutedEventArgs e)
+    {
+        var close = new Button { Content = "Close" };
+        var dialog = new Window { Title = "Keys and colours", Width = 560, SizeToContent = SizeToContent.Height,
+            CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, Icon = Icon };
+        var panel = new StackPanel { Margin = new Thickness(20), Spacing = 10 };
+        panel.Children.Add(new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, Text =
+            "Space: play / pause\n←/→: step the playhead by the beat snap\nWheel: scroll · Ctrl+wheel: zoom · Click: seek\n" +
+            "Drag a red line: move it · Ctrl+drag a beat: stretch the BPM\nDrag an empty area: box-select red lines (Shift+drag adds)\n" +
+            "Ctrl+P or Insert: red line at the playhead · Delete: delete the selected red lines\n" +
+            "Timing table: click selects, double-click jumps, Ctrl+click adds, Shift+click selects a range\n" +
+            "Ctrl+A: select every row · Ctrl+C: copy the selected rows · Esc: clear the selection\n" +
+            "Ctrl+Z / Ctrl+Y: undo / redo · Ctrl+O: open .osu · Ctrl+Shift+O: open audio · Ctrl+S: save\n" +
+            "Ctrl+T: auto-time · Ctrl+Enter: apply the proposal · Ctrl+Shift+P: move the selected lines to the playhead\n" +
+            "Ctrl+←/→: shift the selected lines 1 ms (Ctrl+Shift: 5 ms) · M: metronome · F: follow\n" +
+            "Ctrl+Shift+C: copy all timing points · Ctrl+Shift+N: copy normalized (osu!mania) · F1: this list" });
+        panel.Children.Add(new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, Opacity = 0.8, Text =
+            "Waveform: red = red line, purple = bar line, gray = beat, dim = beat-snap tick, orange = selected, yellow = playhead." });
+        panel.Children.Add(close); dialog.Content = panel;
+        close.Click += (_, _) => dialog.Close();
+        await dialog.ShowDialog(this);
     }
     private void QueueTableSync()
     {
@@ -123,6 +159,31 @@ public partial class MainWindow : Window
         Set(DetailsScroll, Math.Max(48, RightPanel.Bounds.Height - RedLinesTitle.Bounds.Height - RedLinesTitle.Margin.Bottom -
             TableHeader.Bounds.Height - TableHeader.Margin.Bottom - DetailsScroll.Margin.Top - MinListHeight));
     }
+    private void ApplySettings(EditorSettings settings)
+    {
+        model.ApplySettings(settings);
+        WindowState = WindowState.Normal;
+        Width = Math.Max(MinWidth, settings.WindowWidth); Height = Math.Max(MinHeight, settings.WindowHeight);
+        normalSize = new Size(Width, Height);
+        if (settings.WindowMaximized) WindowState = WindowState.Maximized;
+    }
+    private void SaveSettings()
+    {
+        try
+        {
+            model.CaptureSettings(new EditorSettings
+            {
+                WindowWidth = normalSize.Width, WindowHeight = normalSize.Height, WindowMaximized = WindowState == WindowState.Maximized
+            }).Save(SettingsPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* settings are a convenience */ }
+    }
+    private void RestoreDefaults(object? sender, RoutedEventArgs e)
+    {
+        ApplySettings(new EditorSettings());
+        SaveSettings();
+        model.ReportError("Settings restored to their defaults (volumes, metronome, follow, speed, beat snap, auto-time mode, table tab, window size).");
+    }
     private static bool InTextBox(KeyEventArgs e) =>
         e.Source is TextBox || e.Source is Visual v && v.GetVisualAncestors().OfType<TextBox>().Any();
     private void HandleTransportKey(object? sender, KeyEventArgs e)
@@ -134,6 +195,14 @@ public partial class MainWindow : Window
             model.StepSnap(e.Key == Key.Right ? 1 : -1);
             e.Handled = true;
         }
+        // Before the table or a button takes them: Ctrl(+Shift)+←/→ shift the selected red lines 1 (5) ms.
+        else if (e.Key is Key.Left or Key.Right && e.KeyModifiers is KeyModifiers.Control or (KeyModifiers.Control | KeyModifiers.Shift))
+        {
+            int ms = (e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 5 : 1) * (e.Key == Key.Right ? 1 : -1);
+            model.ShiftMsCommand.Execute(ms.ToString(CultureInfo.InvariantCulture));
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.Control) { ApplyAutoTime(this, new RoutedEventArgs()); e.Handled = true; }
     }
     // A button clicks on Space release; the press was taken by the transport, so the release must not click.
     private void SwallowSpaceUp(object? sender, KeyEventArgs e)
@@ -290,8 +359,18 @@ public partial class MainWindow : Window
     private void HandleKey(object? sender, KeyEventArgs e)
     {
         if (InTextBox(e) || e.Handled || model.IsBusy) return;
-        bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-        if (e.Key == Key.Insert || e.Key == Key.P && ctrl) { model.Insert(); e.Handled = true; }
+        bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control), shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        bool plain = e.KeyModifiers == KeyModifiers.None;
+        if (e.Key == Key.O && ctrl) { _ = Open(!shift); e.Handled = true; }
+        else if (e.Key == Key.T && ctrl) { AutoTime(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (e.Key == Key.P && ctrl && shift) { model.MoveToPlayhead(); e.Handled = true; }
+        else if (e.Key == Key.C && ctrl && shift) { CopyTiming(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (e.Key == Key.N && ctrl && shift) { CopyNormalized(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (e.Key == Key.F1) { ShowKeys(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (e.Key == Key.M && plain) { model.ClickEnabled = !model.ClickEnabled; e.Handled = true; }
+        else if (e.Key == Key.F && plain) { model.FollowPlayhead = !model.FollowPlayhead; e.Handled = true; }
+        else if (e.Key == Key.S && ctrl) { SaveOsu(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (e.Key == Key.Insert || e.Key == Key.P && ctrl) { model.Insert(); e.Handled = true; }
         else if (e.Key == Key.Delete) { model.Delete(); e.Handled = true; }
         else if (e.Key == Key.A && ctrl) { TimingTable.SelectAll(); e.Handled = true; }
         else if (e.Key == Key.C && ctrl) { _ = CopySelectedRows(); e.Handled = true; }

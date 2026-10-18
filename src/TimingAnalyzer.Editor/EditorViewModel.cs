@@ -43,7 +43,8 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     private SnapOption snap = new(4);
     private double position, start, span = 10000;
     private double musicVolumePercent = 100, clickVolumePercent = 70;
-    private RedLineScope shiftScope;
+    // The window has no scope box: lines are picked in the timing table (Ctrl+A for all), so shifts act on them.
+    private RedLineScope shiftScope = RedLineScope.Selected;
     private TimingDrag? drag;
     private TimingPoint[]? preview;
     private double dragTime;
@@ -182,6 +183,22 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public string TimeText { get => timeText; set => SetProperty(ref timeText, value); }
     public string BpmText { get => bpmText; set => SetProperty(ref bpmText, value); }
     public string MeterText { get => meterText; set => SetProperty(ref meterText, value); }
+    /// <summary>The settings to remember (the window adds its size).</summary>
+    public EditorSettings CaptureSettings(EditorSettings? window = null) => (window ?? new EditorSettings()) with
+    {
+        MusicVolumePercent = MusicVolumePercent, ClickVolumePercent = ClickVolumePercent, ClickEnabled = ClickEnabled,
+        FollowPlayhead = FollowPlayhead, Speed = SelectedSpeed, SnapDivisor = SnapDivisor, AutoMode = SelectedAutoMode,
+        TableTab = TableTab,
+    };
+    /// <summary>Applies remembered settings through the same setters as the window, so out-of-range values are ignored.</summary>
+    public void ApplySettings(EditorSettings s)
+    {
+        MusicVolumePercent = s.MusicVolumePercent; ClickVolumePercent = s.ClickVolumePercent;
+        ClickEnabled = s.ClickEnabled; FollowPlayhead = s.FollowPlayhead;
+        if (Speeds.Contains(s.Speed)) SelectedSpeed = s.Speed;
+        if (SnapOptions.FirstOrDefault(o => o.Divisor == s.SnapDivisor) is { } snapOption) SelectedSnap = snapOption;
+        SelectedAutoMode = s.AutoMode; TableTab = s.TableTab;
+    }
     public IReadOnlyList<string> Speeds { get; } = ["0.5", "0.75", "1.0"];
     public string SelectedSpeed
     {
@@ -235,6 +252,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public IRelayCommand RedoCommand { get; }
     public IRelayCommand BpmFromSpacingCommand { get; }
     public IRelayCommand StartBarHereCommand { get; }
+    public IRelayCommand MoveToPlayheadCommand { get; }
     public EditorViewModel(Func<string, Task<AudioContent>> loadAudio, Func<string, IPlaybackEngine> createPlayback,
         Func<double>? wallMilliseconds = null)
     {
@@ -248,6 +266,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         RedoCommand = new RelayCommand(Redo);
         BpmFromSpacingCommand = new RelayCommand(BpmFromSpacing);
         StartBarHereCommand = new RelayCommand(StartBarHere);
+        MoveToPlayheadCommand = new RelayCommand(MoveToPlayhead);
         ShiftBeatsCommand = new RelayCommand<string>(value => Run(() => Shift(false, double.Parse(value!, Invariant))));
         ShiftMsCommand = new RelayCommand<string>(value => Run(() => Shift(true, double.Parse(value!, Invariant))));
         Edits.Changed += TimingChanged;
@@ -510,6 +529,22 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
             chosen.Length.ToString(Invariant) + " selected red lines") + " by " +
             amount.ToString("0.##", Invariant) + (milliseconds ? " ms." : " beats.") + " Green lines stay fixed.";
     }
+    /// <summary>
+    /// Moves the selected red lines by the distance from the line clicked last to the playhead, so that line lands on
+    /// the playhead (put the playhead on the hit by ear or with ←/→, pick the line in the table, then this). One undo step.
+    /// </summary>
+    public void MoveToPlayhead() => Run(() =>
+    {
+        CancelDrag();
+        if (selectedRow is not { } row) throw new InvalidOperationException("Select the red line to move in the timing table first.");
+        double delta = OsuPrecision.Time(PositionMs) - row.Point.Time;
+        if (delta == 0) { Status = "The red line is already on the playhead."; return; }
+        int[] chosen = selection;
+        Edits.ShiftRedLinesMs(RedLineScope.Selected, delta, chosen);
+        SetSelection(chosen, row.Index);
+        Status = (chosen.Length == 1 ? "Red line" : chosen.Length.ToString(Invariant) + " red lines") + " moved by " +
+            delta.ToString("+0;-0", Invariant) + " ms onto the playhead at " + TimeFormat.Osu(PositionMs) + ". Ctrl+Z undoes.";
+    });
     public Task AnalyzeAsync(Func<AudioContent, Task<TimingDetection>> analyze) => AnalyzeAsync((audio, _) => analyze(audio));
     /// <summary>Whole-song auto-time, honouring the BPM box. Nothing changes until the proposal is applied.</summary>
     public async Task AnalyzeAsync(Func<AudioContent, TimingRequest, Task<TimingDetection>> analyze)
@@ -732,7 +767,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
                 return;
             }
             MultiProposal = arrange is null ? found : arrange(found);
-            Status = MultiProposal.Description + note + hint;
+            Status = MultiProposal.Summary + note + hint;
         }
         catch (Exception ex) { Status = "Auto-time failed: " + ex.Message; }
         finally { IsBusy = false; }

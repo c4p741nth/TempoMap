@@ -187,8 +187,20 @@ Note that the original writes status lines and the timeline to **stderr**, and o
 
 ## Phase 1 desktop timing editor
 
-Timing Analyzer is made by **C4P741N**; **About** in the editor shows the version (releases are named vYYYYMMDD.n)
-and credits.
+Timing Analyzer is made by **C4P741N**; **Help → About Redline** shows the version (releases are named
+vYYYYMMDD.n) and credits.
+
+The window has a menu bar (**File**: open, save, copy timing points, copy normalized; **Edit**: undo/redo, insert,
+delete, select and copy rows; **Timing**: auto-time and apply, move to playhead, ms shifts and the per-line tools;
+**Settings**: metronome, follow, restore default settings; **Help**: keys and colours (F1), about). Under it are
+three toolbars: playback (Play / Pause, Follow, beat snap, speed, metronome and music volume), Auto-time (mode, BPM
+box and, while a proposal waits, its offset and **Apply...**) and Shift (beat and ms buttons, **To playhead**). The
+editor remembers volumes, metronome, follow, speed, beat snap, auto-time mode, table tab and window size between
+runs (`%APPDATA%\Redline\settings.json`); **Settings → Restore default settings** resets them.
+
+Shortcuts: Ctrl+O open .osu, Ctrl+Shift+O open audio, Ctrl+S save, Ctrl+Shift+C copy timing points, Ctrl+Shift+N
+copy normalized, Ctrl+T auto-time, Ctrl+Enter apply, Ctrl+Shift+P move the selected lines to the playhead,
+Ctrl+←/→ shift them 1 ms (Ctrl+Shift+←/→ 5 ms), M metronome, F follow, F1 the full list.
 
 The Avalonia editor opens audio or an osu! `.osu` beatmap, displays waveform peaks and a section-aware
 beat grid, and plays audio with a metronome at 1.0, 0.75 or 0.5 speed with pitch preserved. It supports
@@ -209,7 +221,8 @@ Open a map beside its audio file. Click to seek, Space to play/pause, Ctrl+wheel
 the bottom slider to scroll. Drag a red line to move its offset; Ctrl+drag a later beat to stretch BPM
 with the section start fixed. Insert or Ctrl+P adds a red line at the playhead, Delete removes the
 selected lines, and Ctrl+Z/Ctrl+Y undo/redo. The side panel also accepts time, BPM and meter edits via
-Apply fields. Clicking a red line in the side list jumps there (playhead on the line, line one third from the
+Apply fields. Clicking a row in the timing table only selects it (the playhead stays, so the line can be moved
+onto it with **To playhead**); double-clicking jumps there (playhead on the line, line one third from the
 left); while playing with Follow on, the list selects and scrolls to the red line under the playhead. Space
 always plays/pauses, even right after clicking another button (only text boxes keep it). The loaded song's
 "Artist - Title [Difficulty] (Mapper)" (or the audio file name) heads the window.
@@ -240,12 +253,14 @@ slider scrolling while playing pauses follow: scrolled **ahead**, it resumes by 
 reaches one third of that view (no jump); scrolled **back**, the view stays so you can look back. A click
 to seek, ←/→, Play or an off/on toggle of Follow resumes it at once. Pausing leaves the view in place.
 
-The Shift group moves All red lines or every Selected red line by −1, −½, −¼, −⅛, +⅛, +¼, +½ or +1 beat,
+The Shift group moves the selected red lines (pick them in the timing table or box-select them; Ctrl+A for all) by −1, −½, −¼, −⅛, +⅛, +¼, +½ or +1 beat,
 or nudges by −5, −1, +1 or +5 ms. Beat shifts use each red line's own beat length, and each moved line
 then lands on a whole ms. Each press is one undo step; negative times are allowed.
 **Green lines (inherited SV/sample changes) stay fixed.** A shift that would make a red line cross or
 touch an unmoved neighbour (or reorder lines) is rejected with a status message and leaves timing
-unchanged; selected lines may move past each other's old positions.
+unchanged; selected lines may move past each other's old positions. **To playhead** (Ctrl+Shift+P) moves the
+selected lines by the distance from the line clicked last to the playhead, so that line lands on the playhead:
+place the playhead on the hit by ear or with ←/→, click the line in the table, then press it.
 
 **Auto-time** changes nothing until **Apply...** is confirmed; Apply replaces every red line in one undo step and
 keeps green lines. In **Normal** mode a steady song comes back as one red line whose offset can be edited before
@@ -254,7 +269,8 @@ to it is empty for detection; type a BPM (e.g. `160`) to lock it, and Auto-time 
 with only the offset fitted (MAMBO COMBO: detected 159.997 / 351, locked 160 / 352). **Auto-time section** and **Fit
 offset** (right panel) work on the selected red line.
 
-With several tempos, Normal mode proposes one red line per tempo section and lists them before you commit.
+With several tempos, Normal mode proposes one red line per tempo section; the status line gives their number and
+BPM range before you commit.
 Measured on 30 single-BPM
 maps and, on their held-out halves, 40 multi-BPM, 101 multi-BPM osu!mania, 7 hard and 24 ranked picks (final table
 in `docs/PHASE3-STATUS.md`, "P3 final report"): single-BPM songs come out bit-identical to the single-BPM
@@ -298,7 +314,7 @@ beat, the proposal sets "omit first barline" on every red line off a 4/4 bar cou
 bars are off, select the red line on a downbeat and press **Bar line here** (right panel) to count from it.
 
 The **timing table** (right) has osu!'s three tabs, **All**, **Timing** and **Inherited**, with its columns (offset,
-BPM or SV, meter, sample, volume, kiai). Click a row to jump there; Ctrl+click and Shift+click select several, and
+BPM or SV, meter, sample, volume, kiai). Click a row to select it, double-click to jump there; Ctrl+click and Shift+click select several, and
 the selected red lines are what the editing tools act on. **Copy selected** (Ctrl+C) copies the selected rows, red
 and green, as timing point rows to paste into the osu! editor; Ctrl+A selects every row of the tab. Green lines are
 read-only here.
@@ -332,7 +348,7 @@ where the next section starts (0.5x speed, ←/→ or Ctrl+P), box-select them, 
   (within 4 ms). The selected lines after the first move onto the end of the step before, truncated to whole
   ms as the osu! editor does, so the steps chain exactly. A line more than 16 beats from the next keeps its BPM.
 When auto-time left a line of the next section near its start (RPG: 179858@110, 255447@210), move that line onto
-the start with the ±1 beat buttons (Shift scope Selected) instead of placing a new one, and leave it out of the
+the start with the ±1 beat buttons instead of placing a new one, and leave it out of the
 snap: its grid is fitted over the whole section, so the last step measures against it better than against one
 onset. Do not snap in quiet passages (RPG's ending at 354-358 s); place those lines by ear. The last red line of a
 song has no next line to measure: type its BPM. Rehearsed on RPG from the audio alone (auto-time, delete the four
