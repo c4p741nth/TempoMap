@@ -1,6 +1,8 @@
 # Agent instructions
 
-This repo rebuilds TimingAnlyz 0.32.4, an osu! BPM/offset detector.
+This repo is **Redline**, a timing editor for osu! by C4P741N (public: github.com/c4p741nth/redline, MIT). It started
+by rebuilding TimingAnlyz 0.32.4, an osu! BPM/offset detector; the history before the public release is in the
+private c4p741nth/timing-analyzer-history.
 
 - **Open work across all phases: `docs/TODO.md`.** Phase 3 (complex multi-BPM) is done: `docs/PHASE3-PLAN.md`,
   results in `docs/PHASE3-STATUS.md` ("P3 final report").
@@ -18,7 +20,9 @@ This repo rebuilds TimingAnlyz 0.32.4, an osu! BPM/offset detector.
 - Format every number and date with `CultureInfo.InvariantCulture`. This machine runs th-TH with the
   Thai Buddhist calendar.
 - Do one task at a time. Build and test until green, then `git commit`. Never leave verified work
-  uncommitted, and never push.
+  uncommitted. Push or release only when the user asks; releases are tagged vYYYYMMDD.n (the n-th that day), with
+  the App csproj `InformationalVersion` set to match, and ship a self-contained win-x64 zip without .pdb files and
+  without the unused ffmpeg libraries.
 - Count things with a script, not by eye, when reporting numbers (failures, mismatches, sizes).
 - If the same parity mismatch survives two fix attempts, stop. Report the stage-by-stage diff
   instead of loosening thresholds.

@@ -47,11 +47,13 @@ Status values: `todo`, `in-progress`, `done`, `blocked`.
 
 ## Last stop
 
-- When: 2026-10-16
-- Who (executor/model): Claude Opus 5.5 (E13–E19; Codex was at its usage limit)
-- Stopped because: E19 is complete; Phase 1 is feature-complete per the user ("perfect" after the follow fix). Phase 2 planning starts in docs/PHASE2-PLAN.md.
-- Working tree state: All verified task work committed; no push.
-- Next step: Run docs/EDITOR-MANUAL-TEST.md, including "Phase 1.2" and "Phase 1.3" (BPM lock, Fit offset / Auto-time section on MAMBO COMBO by ear, zoom while following, volume response, osu! time label). Earlier E10–E12 checks also remain pending.
+- When: 2026-10-18
+- Who (executor/model): Claude Opus 5.5 (E25–E31)
+- Stopped because: Redline v20261018.0 is released (github.com/c4p741nth/redline, tag v20261018.0, zip SHA-256
+  2e82acf797838fc5a327ce260c136cb7c4f2c60b4f2c95b8989d7a6b63923ae9).
+- Working tree state: everything committed and pushed; `reverse/` is local only (ignored).
+- Next step: run docs/EDITOR-MANUAL-TEST.md by ear and in osu! (Billie Jean per-beat lines and its 19 beats with two
+  attacks listed in PHASE3-STATUS, bar lines, Copy normalized in mania, the timing table, the small-window layout).
 
 ## Final verification
 
