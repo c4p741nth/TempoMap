@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>TimingAnalyzer.App</RootNamespace>
+    <AssemblyName>Redline</AssemblyName>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <!-- Skip Avalonia.BuildServices' stats task: it writes %LOCALAPPDATA%\AvaloniaUI\BuildServices\buildtasks.log,
+         which the Codex sandbox denies, and it is telemetry only. -->
+    <UsedAvaloniaProducts></UsedAvaloniaProducts>
+    <!-- The .exe's icon in Explorer and the taskbar; the window uses the same file as an Avalonia resource. -->
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <!-- Release version vYYYYMMDD.n (the n-th release that day); the About box shows the informational version. -->
+    <Version>2026.10.18.0</Version>
+    <InformationalVersion>20261018.0</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <Authors>C4P741N</Authors>
+    <Product>Redline</Product>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\icon.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TimingAnalyzer.Core\TimingAnalyzer.Core.csproj" />
+    <ProjectReference Include="..\TimingAnalyzer.Audio\TimingAnalyzer.Audio.csproj" />
+    <ProjectReference Include="..\TimingAnalyzer.Editor\TimingAnalyzer.Editor.csproj" />
+  </ItemGroup>
+
+</Project>

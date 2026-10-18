@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>TimingAnalyzer.Audio</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ManagedBass" />
+    <PackageReference Include="ManagedBass.Mix" />
+    <PackageReference Include="ManagedBass.Fx" />
+    <PackageReference Include="ppy.osu.Framework.NativeLibs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TimingAnalyzer.Editor\TimingAnalyzer.Editor.csproj" />
+  </ItemGroup>
+
+</Project>

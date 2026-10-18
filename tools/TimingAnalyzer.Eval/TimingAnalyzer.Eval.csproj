@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>TimingAnalyzer.Eval</RootNamespace>
+    <AssemblyName>timing-eval</AssemblyName>
+    <!-- win-x64 so the BASS natives from ppy.osu.Framework.NativeLibs land next to the exe -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TimingAnalyzer.Core\TimingAnalyzer.Core.csproj" />
+    <ProjectReference Include="..\..\src\TimingAnalyzer.Audio\TimingAnalyzer.Audio.csproj" />
+    <ProjectReference Include="..\..\src\TimingAnalyzer.Editor\TimingAnalyzer.Editor.csproj" />
+  </ItemGroup>
+
+</Project>

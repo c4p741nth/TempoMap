@@ -1,0 +1,189 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:e="using:TimingAnalyzer.Editor" xmlns:local="using:TimingAnalyzer.App"
+        x:Class="TimingAnalyzer.App.MainWindow" x:DataType="e:EditorViewModel"
+        Title="{Binding WindowTitle}" Width="1280" Height="720" MinWidth="900" MinHeight="500"
+        Icon="/Assets/icon.ico">
+  <Window.Styles>
+    <!-- The timing table: compact tabs and rows (Fluent's defaults are 24 px tab text and 40 px list rows). -->
+    <Style Selector="TabStripItem">
+      <Setter Property="FontSize" Value="13" /><Setter Property="MinHeight" Value="26" /><Setter Property="Padding" Value="8,2" />
+    </Style>
+    <Style Selector="ListBox.timing ListBoxItem">
+      <Setter Property="Padding" Value="4,1" /><Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ListBox.timing TextBlock, Grid.tableHeader TextBlock">
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+  </Window.Styles>
+  <DockPanel Margin="16">
+    <!-- Docked first, so the red-line panel spans the full window height instead of the space below the toolbars. -->
+    <Border DockPanel.Dock="Right" Width="360" Padding="12,0,0,0">
+      <!-- The details scroll on a short window (MainWindow.FitPanels) so the table keeps at least MinListHeight. -->
+      <Grid x:Name="RightPanel" RowDefinitions="Auto,Auto,*,Auto" IsEnabled="{Binding CanInteract}">
+        <DockPanel x:Name="RedLinesTitle" Grid.Row="0" Margin="0,0,0,4">
+          <Button DockPanel.Dock="Right" Content="Copy selected" Click="CopySelected"
+                  ToolTip.Tip="Copy the selected rows (red and green lines) as osu! timing point rows (Ctrl+C). Ctrl+A selects every row of the tab." />
+          <TabStrip ItemsSource="{Binding TableTabs}" SelectedIndex="{Binding TableTab, Mode=TwoWay}"
+                    ToolTip.Tip="All: red and green lines. Timing: red lines (timing points). Inherited: green lines (slider velocity, volume, kiai), read-only here. In the table: click a row to jump there; Ctrl+click adds or removes a row, Shift+click selects a range, Ctrl+A all, Ctrl+C copies. While playing with Follow on, the red line under the playhead is selected." />
+        </DockPanel>
+        <Grid x:Name="TableHeader" Grid.Row="1" Classes="tableHeader" ColumnDefinitions="14,76,60,52,46,40,22" Margin="4,0,4,2" Opacity="0.7">
+          <TextBlock Grid.Column="1" Text="Offset" /><TextBlock Grid.Column="2" Text="BPM" />
+          <TextBlock Grid.Column="3" Text="Meter" ToolTip.Tip="Beats per bar; nb = no bar line (osu!'s omit first barline)." />
+          <TextBlock Grid.Column="4" Text="Sample" /><TextBlock Grid.Column="5" Text="Vol." /><TextBlock Grid.Column="6" Text="Ki" />
+        </Grid>
+        <ListBox x:Name="TimingTable" Grid.Row="2" Classes="timing" SelectionMode="Multiple" ItemsSource="{Binding TableRows}"
+                 SelectionChanged="TableSelectionChanged">
+          <!-- No tooltip on the table itself: a tooltip popup over the rows took the clicks meant for them. -->
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="e:TimingRow">
+              <Grid ColumnDefinitions="14,76,60,52,46,40,22">
+                <TextBlock Text="●" Foreground="#E0453A" IsVisible="{Binding IsRed}" />
+                <TextBlock Text="●" Foreground="#3FAE49" IsVisible="{Binding IsGreen}" />
+                <TextBlock Grid.Column="1" Text="{Binding Offset}" FontFamily="Consolas,monospace" />
+                <TextBlock Grid.Column="2" Text="{Binding Value}" />
+                <TextBlock Grid.Column="3" Text="{Binding Meter}" />
+                <TextBlock Grid.Column="4" Text="{Binding Sample}" />
+                <TextBlock Grid.Column="5" Text="{Binding Volume}" />
+                <TextBlock Grid.Column="6" Text="{Binding Kiai}" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <ScrollViewer x:Name="DetailsScroll" Grid.Row="3" Margin="0,12,0,0"
+                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="6">
+            <TextBlock Text="Selected red line" FontWeight="Bold" />
+            <TextBlock Text="{Binding SelectionLabel}" Opacity="0.75" ToolTip.Tip="The fields edit the red line clicked last; shift (scope Selected) and Delete act on every selected red line." />
+            <!-- Four equal columns: in a StackPanel Redo ran 30 px past the panel. -->
+            <Grid ColumnDefinitions="*,6,*,6,*,6,*">
+              <Button Grid.Column="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Insert" Command="{Binding InsertCommand}" />
+              <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Delete" Command="{Binding DeleteCommand}" />
+              <Button Grid.Column="4" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Undo" Command="{Binding UndoCommand}" />
+              <Button Grid.Column="6" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Redo" Command="{Binding RedoCommand}" />
+            </Grid>
+            <TextBlock Text="Time (ms)" /><TextBox Text="{Binding TimeText, Mode=TwoWay}" />
+            <TextBlock Text="BPM" /><TextBox Text="{Binding BpmText, Mode=TwoWay}" />
+            <TextBlock Text="Meter (beats per measure)" /><TextBox Text="{Binding MeterText, Mode=TwoWay}" />
+            <Button Content="Apply fields" Command="{Binding ApplyFieldsCommand}" />
+            <!-- Two equal columns, as the ramp tools below. -->
+            <Grid ColumnDefinitions="*,6,*">
+              <Button Grid.Column="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Auto-time section" Click="AutoTimeSection"
+                      ToolTip.Tip="Analyze from the selected red line to the next one: detect its BPM (or use the BPM box) and move the line onto the nearest detected beat. One undo step." />
+              <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Fit offset" Click="FitOffset"
+                      ToolTip.Tip="Keep the selected red line's BPM and move it onto the nearest detected beat of its section (up to the next red line). One undo step." />
+            </Grid>
+            <Button Content="Bar line here" Command="{Binding StartBarHereCommand}"
+                    ToolTip.Tip="For a red line on every beat: put a bar line on the selected red line and count bars of its meter from there; every later red line that is not on a bar start gets osu!'s &quot;omit first barline&quot;. Lines before it stay as they are. One undo step." />
+            <TextBlock Text="Short tempo steps (ramps)" FontWeight="Bold" Margin="0,6,0,0" />
+            <!-- Two equal columns: side by side in a StackPanel the second button ran past the panel. -->
+            <Grid ColumnDefinitions="*,6,*">
+              <Button Grid.Column="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="Snap to onsets" Click="SnapToOnsets"
+                      ToolTip.Tip="Move each selected red line onto the strongest onset near it, within a quarter beat (at most 60 ms); an onset 20 ms away counts half. Put a red line on every step's accent by ear (Ctrl+P while playing, or ←/→ then Ctrl+P), box-select them, then snap. Snap only lines that start on a clear hit: where the music holds a note there is no onset to find. One undo step." />
+              <Button Grid.Column="2" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Content="BPM from spacing" Command="{Binding BpmFromSpacingCommand}"
+                      ToolTip.Tip="Set each selected red line's BPM from the gap to the next red line: the nearest 1, 1.5, 2… 16 beats at the previous step's tempo, rounded to a multiple of 5, else a whole BPM, when that moves the step's end by at most 4 ms. The selected lines after the first move onto the end of the step before (as osu! mappers chain ramp steps). One undo step." />
+            </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </Border>
+    <!-- Toolbars / waveform / status. On a short window the toolbars scroll (MainWindow.FitPanels) instead of pushing
+         the waveform below MinWaveformHeight: at 900x500 they were 738 px tall and cut off the apply row. -->
+    <Grid x:Name="MainArea" RowDefinitions="Auto,*,Auto">
+      <ScrollViewer x:Name="TopScroll" Grid.Row="0" Margin="0,0,0,12"
+                    HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="10">
+          <TextBlock Text="{Binding SongTitle}" FontSize="18" FontWeight="Bold" TextTrimming="CharacterEllipsis"
+                     ToolTip.Tip="{Binding SongTitle}" />
+          <WrapPanel Orientation="Horizontal" IsEnabled="{Binding CanInteract}">
+            <Button Content="Open audio" Click="OpenAudio" />
+            <Button Content="Open .osu" Click="OpenOsu" />
+            <Button Content="Play / Pause (Space)" Command="{Binding TogglePlayCommand}" />
+            <TextBlock Text="Beat snap" VerticalAlignment="Center" />
+            <ComboBox Width="80" ItemsSource="{Binding SnapOptions}" SelectedItem="{Binding SelectedSnap, Mode=TwoWay}"
+                      ToolTip.Tip="Grid ticks and ←/→ playhead steps per beat" />
+            <TextBlock Text="Speed" VerticalAlignment="Center" />
+            <ComboBox Width="90" ItemsSource="{Binding Speeds}" SelectedItem="{Binding SelectedSpeed, Mode=TwoWay}" />
+            <TextBlock Text="Music" Margin="8,0,4,0" VerticalAlignment="Center" />
+            <Slider Width="90" Minimum="0" Maximum="100" Value="{Binding MusicVolumePercent, Mode=TwoWay}" />
+            <TextBlock Width="48" Text="{Binding MusicVolumeLabel}" VerticalAlignment="Center" />
+            <TextBlock Text="Metronome" Margin="8,0,4,0" VerticalAlignment="Center" />
+            <Slider Width="90" Minimum="0" Maximum="100" Value="{Binding ClickVolumePercent, Mode=TwoWay}" />
+            <TextBlock Width="48" Text="{Binding ClickVolumeLabel}" VerticalAlignment="Center" />
+            <CheckBox Content="Metronome" IsChecked="{Binding ClickEnabled, Mode=TwoWay}" />
+            <Button Content="About" Click="ShowAbout" ToolTip.Tip="Version, author and credits." />
+            <CheckBox Content="Follow" IsChecked="{Binding FollowPlayhead, Mode=TwoWay}"
+                      ToolTip.Tip="Keep the playhead one third from the left while playing; zooming keeps following. Scrolling ahead resumes follow when the playhead catches up; scrolling back holds the view until a seek, ←/→, Play or toggling Follow." />
+          </WrapPanel>
+          <!-- Wraps: with Copy normalized the row is wider than the 900 px minimum window. -->
+          <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="6" IsEnabled="{Binding CanInteract}">
+            <Button Content="Auto-time" Click="AutoTime"
+                    ToolTip.Tip="Analyze the whole song and propose red lines; nothing changes until Apply. Normal: one red line for a steady song (offset editable), a red line per tempo change otherwise. Drift: a red line every N beats on a grid that follows a drifting tempo; 1 beat puts one on every drum hit (drums played live). With a BPM in the box: one red line at that BPM." />
+            <ComboBox Width="130" ItemsSource="{Binding AutoModes}" SelectedItem="{Binding SelectedAutoMode, Mode=TwoWay}"
+                      ToolTip.Tip="Normal suits almost every song. Drift is for a tempo that drifts or drums played live (Billie Jean): fewer beats per red line follow the drums more closely; 1 beat = a red line on every drum hit. Drift lines on a steady song are worse than one red line." />
+            <TextBlock Text="BPM" VerticalAlignment="Center" />
+            <TextBox Width="90" PlaceholderText="auto" Text="{Binding LockedBpmText, Mode=TwoWay}"
+                     ToolTip.Tip="Empty: detect the BPM. Type a BPM (for example 160) to lock it: Auto-time then proposes one red line at that BPM and finds only the offset; Auto-time section uses it too." />
+            <Button Content="Copy timing points" Click="CopyTiming"
+                    ToolTip.Tip="Copies the timing point rows only (red and green lines, no [TimingPoints] header), ready to paste into the osu! editor." />
+            <Button Content="Copy normalized" Click="CopyNormalized"
+                    ToolTip.Tip="Copies red and green lines with the scroll speed normalised for osu!mania: every red line gets a green line with SV = main BPM / its BPM (main BPM = the one held longest up to the last note, as osu! counts it), with the red line's sample set and volume; existing green lines keep their own SV on top. Green lines already normalised are not normalised twice. The timing here is not changed." />
+            <Button Content="Save .osu" Click="SaveOsu" />
+          </WrapPanel>
+          <!-- Only while a proposal waits to be applied; right under the auto-time buttons, scrolled into view when it appears. -->
+          <StackPanel x:Name="ProposalPanel" Spacing="10" IsVisible="{Binding HasProposal}">
+            <TextBlock Text="{Binding ProposalDescription}" TextWrapping="Wrap" />
+            <WrapPanel x:Name="ApplyRow" Orientation="Horizontal" ItemSpacing="8" LineSpacing="6" IsEnabled="{Binding CanInteract}">
+              <TextBlock Text="Offset (ms)" VerticalAlignment="Center" IsVisible="{Binding HasSingleProposal}" />
+              <TextBox Width="110" Text="{Binding ProposalOffsetText, Mode=TwoWay}" IsVisible="{Binding HasSingleProposal}"
+                       ToolTip.Tip="The proposed red line's offset; edit it before Apply if it should start elsewhere." />
+              <Button Content="Apply..." Click="ApplyAutoTime"
+                      ToolTip.Tip="Replace all red lines with the proposal (asks first). One undo step; green lines stay." />
+            </WrapPanel>
+            <!-- Bounded: a long multi-BPM proposal must not push the waveform and the red-line list off the window. -->
+            <ScrollViewer MaxHeight="96" VerticalScrollBarVisibility="Auto" Margin="0,2,0,0">
+              <ItemsControl ItemsSource="{Binding ProposalSections}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding}" FontFamily="Consolas,monospace" Opacity="0.85" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </StackPanel>
+          <TextBlock Text="Red: section · Purple: measure · Gray: beat · Dim: beat-snap tick · Orange: selected · Yellow: playhead" />
+          <WrapPanel IsEnabled="{Binding CanInteract}" ToolTip.Tip="Shift red lines only. Green lines (SV/sample changes) stay fixed. Selected moves every selected red line (box-select several); a shift that would cross or reach an unselected red line is rejected. Each shift is one undo step. Moved lines snap to whole ms.">
+            <TextBlock Text="Shift" FontWeight="Bold" Margin="0,0,8,0" VerticalAlignment="Center" />
+            <ComboBox Width="110" ItemsSource="{Binding ShiftScopes}" SelectedItem="{Binding ShiftScope, Mode=TwoWay}" />
+            <TextBlock Text="beats" Margin="8,0,4,0" VerticalAlignment="Center" />
+            <Button Content="−1" Command="{Binding ShiftBeatsCommand}" CommandParameter="-1" />
+            <Button Content="−½" Command="{Binding ShiftBeatsCommand}" CommandParameter="-0.5" />
+            <Button Content="−¼" Command="{Binding ShiftBeatsCommand}" CommandParameter="-0.25" />
+            <Button Content="−⅛" Command="{Binding ShiftBeatsCommand}" CommandParameter="-0.125" />
+            <Button Content="+⅛" Command="{Binding ShiftBeatsCommand}" CommandParameter="0.125" />
+            <Button Content="+¼" Command="{Binding ShiftBeatsCommand}" CommandParameter="0.25" />
+            <Button Content="+½" Command="{Binding ShiftBeatsCommand}" CommandParameter="0.5" />
+            <Button Content="+1" Command="{Binding ShiftBeatsCommand}" CommandParameter="1" />
+            <TextBlock Text="ms" Margin="8,0,4,0" VerticalAlignment="Center" />
+            <Button Content="−5" Command="{Binding ShiftMsCommand}" CommandParameter="-5" />
+            <Button Content="−1" Command="{Binding ShiftMsCommand}" CommandParameter="-1" />
+            <Button Content="+1" Command="{Binding ShiftMsCommand}" CommandParameter="1" />
+            <Button Content="+5" Command="{Binding ShiftMsCommand}" CommandParameter="5" />
+          </WrapPanel>
+        </StackPanel>
+      </ScrollViewer>
+      <StackPanel x:Name="BottomPanel" Grid.Row="2" Spacing="6" Margin="0,10,0,0">
+        <TextBlock Text="{Binding PositionLabel}" FontSize="16" FontWeight="Bold"
+                   ToolTip.Tip="Position / song length as in the osu! editor (mm:ss:ms): 00:01:531 is offset 1531." />
+        <!-- At most four lines (a long summary would squeeze the waveform); the whole text is in the tooltip. -->
+        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Status}" />
+        <!-- One line on a narrow window (three at 900 px took the waveform's room); the tooltip has all of it. -->
+        <TextBlock Text="←/→: step by beat snap · Ctrl+wheel: zoom · Wheel: scroll · Click: seek · Drag empty area: box-select red lines (Shift+drag adds) · Drag red: move · Ctrl+drag beat: stretch · Ctrl+P / Insert: add red line · Ctrl+A: select all · Esc: clear selection · Delete · Ctrl+Z / Ctrl+Y" Opacity="0.65" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="←/→: step by beat snap · Ctrl+wheel: zoom · Wheel: scroll · Click: seek · Drag empty area: box-select red lines (Shift+drag adds) · Drag red: move · Ctrl+drag beat: stretch · Ctrl+P / Insert: add red line · Ctrl+A: select all · Esc: clear selection · Delete · Ctrl+Z / Ctrl+Y" />
+      </StackPanel>
+      <DockPanel Grid.Row="1">
+        <Slider x:Name="ScrollSlider" DockPanel.Dock="Bottom" Minimum="0" Maximum="{Binding ScrollMaximum}" Value="{Binding ManualStartMs, Mode=TwoWay}" />
+        <local:WaveformControl x:Name="Waveform" IsEnabled="{Binding CanInteract}" />
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+</Window>

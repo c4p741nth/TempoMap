@@ -1,0 +1,23 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Audio: ManagedBass wrapper + BASS 2.4.17 x64 natives (bass, bassmix, bass_fx), the build current osu.Framework uses.
+         2022.525.0 (the newest version without a suffix) ships the older BASS 2.4.16. -->
+    <PackageVersion Include="ManagedBass" Version="4.0.2" />
+    <PackageVersion Include="ppy.osu.Framework.NativeLibs" Version="2025.806.0-nativelibs" />
+    <PackageVersion Include="ManagedBass.Mix" Version="4.0.2" />
+    <PackageVersion Include="ManagedBass.Fx" Version="4.0.2" />
+    <!-- Editor / App (Phase 1) -->
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageVersion Include="Avalonia" Version="12.1.4" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.4" />
+    <!-- Tests (versions from the .NET 10 SDK xunit template) -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+</Project>

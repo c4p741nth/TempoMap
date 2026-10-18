@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>TimingAnalyzer.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Diagnostics only: the eval harness and tests reach the multi-BPM stages directly. -->
+    <InternalsVisibleTo Include="timing-eval" />
+    <InternalsVisibleTo Include="TimingAnalyzer.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="coefficients.json" LogicalName="TimingAnalyzer.Core.coefficients.json" />
+  </ItemGroup>
+
+</Project>

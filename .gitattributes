@@ -1,0 +1,2 @@
+# Keep osu! fixtures byte-exact (round-trip tests compare bytes)
+tests/**/Fixtures/*.osu -text

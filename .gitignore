@@ -1,0 +1,19 @@
+# REA / Ghidra analysis snapshots (large, regenerable)
+*.snapshot
+# never commit the analysed binary or its runtime
+*.exe
+*.dll
+__pycache__/
+.venv/
+# per-stage golden data from tools/dump_golden.py (large, regenerable)
+tests/golden/
+bin/
+obj/
+.dotnet-home/
+TestResults/
+# Phase 2 evaluation: cached onset envelopes (regenerable)
+.eval-cache/
+# ML probe environment (tools/beat_probe.py: CPU torch + Beat This!)
+.venv-ml/
+# Decompiler output of the original exe: kept locally, not published
+reverse/
