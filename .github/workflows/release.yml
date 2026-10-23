@@ -1,0 +1,104 @@
+name: Release
+
+# A push to main (the merge of develop) builds the zip and makes a DRAFT PRE-RELEASE named after the App csproj's
+# InformationalVersion (v20261023.0). Nothing goes public until a person opens the draft and presses Publish.
+# If that version already has a release (or a draft), the run only says so: raise the version in the pull request
+# from develop to release again. docs/RELEASE.md has the whole flow.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write          # create the draft release and its tag
+      id-token: write          # artifact attestation (signing certificate)
+      attestations: write
+      artifact-metadata: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Version and tag
+        id: version
+        shell: pwsh
+        run: |
+          [xml] $xml = Get-Content -Raw src/TimingAnalyzer.App/TimingAnalyzer.App.csproj
+          $info = $xml.SelectSingleNode('//InformationalVersion').InnerText.Trim()
+          $tag = "v$info"
+          # A published release has its tag; a draft has only its name in the list.
+          $known = @(gh release list --limit 200 --json tagName --jq '.[].tagName')
+          gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/$tag" *> $null
+          $tagExists = ($LASTEXITCODE -eq 0)
+          $global:LASTEXITCODE = 0
+          if ($known -contains $tag -or $tagExists) {
+            Write-Host "::notice title=No release::$tag already has a release or a tag. Raise Version and InformationalVersion in the App csproj to release again."
+            "release=false" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          } else {
+            "release=true" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+          }
+          "tag=$tag" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - uses: actions/setup-dotnet@v6
+        if: steps.version.outputs.release == 'true'
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build and test
+        if: steps.version.outputs.release == 'true'
+        run: |
+          dotnet restore
+          dotnet build -c Release --no-restore
+          dotnet test -c Release --no-build --filter "FullyQualifiedName!~GoldenTests"
+
+      - name: Package
+        id: package
+        if: steps.version.outputs.release == 'true'
+        shell: pwsh
+        run: ./tools/package-release.ps1 -OutputDirectory artifacts
+
+      # Provenance: the zip was built from this commit by this workflow (public repositories on every plan).
+      - name: Attest the zip
+        if: steps.version.outputs.release == 'true' && github.event.repository.private == false
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.package.outputs.zip }}
+
+      - uses: actions/upload-artifact@v7
+        if: steps.version.outputs.release == 'true'
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: |
+            ${{ steps.package.outputs.zip }}
+            ${{ steps.package.outputs.sha256file }}
+          retention-days: 30
+
+      - name: Draft the release
+        if: steps.version.outputs.release == 'true'
+        shell: pwsh
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          ZIP: ${{ steps.package.outputs.zip }}
+          SHA256FILE: ${{ steps.package.outputs.sha256file }}
+          SHA256: ${{ steps.package.outputs.sha256 }}
+        run: |
+          $notes = (Get-Content -Raw tools/release/notes.template.md).
+            Replace('{tag}', $env:TAG).Replace('{sha256}', $env:SHA256).Replace('{commit}', $env:GITHUB_SHA).Replace('{repo}', $env:GITHUB_REPOSITORY)
+          # The pull requests merged since the last release, as GitHub lists them.
+          $generated = gh api -X POST "repos/$env:GITHUB_REPOSITORY/releases/generate-notes" -f tag_name=$env:TAG -f target_commitish=$env:GITHUB_SHA --jq .body
+          if ($LASTEXITCODE -ne 0) { $generated = ''; $global:LASTEXITCODE = 0 }
+          Set-Content -LiteralPath release-notes.md -Value ($notes + "`n## Changes`n`n" + $generated) -Encoding utf8
+          gh release create $env:TAG $env:ZIP $env:SHA256FILE --draft --prerelease --target $env:GITHUB_SHA --title "Tempomap $env:TAG" --notes-file release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
+          "### Draft release $env:TAG`n`nOpen it under Releases, read the notes, and press Publish when it is right." | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Encoding utf8

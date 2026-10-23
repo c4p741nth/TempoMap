@@ -346,7 +346,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) { model.ReportError("Enter a valid proposal offset: " + ex.Message); }
     }
-    /// <summary>The release this build is ("20261019.2"), from the App project's InformationalVersion.</summary>
+    /// <summary>The release this build is ("20261023.0"), from the App project's InformationalVersion.</summary>
     public static string Version => typeof(MainWindow).Assembly
         .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
         .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion ?? "dev";
