@@ -25,7 +25,8 @@ public static class DrumWobble
     public static Result? Measure(double[] mono, double rate, IReadOnlyList<TrackedBeat> beats)
     {
         var kept = beats.Where(b => b.Weight > 0).Select(b => b.TimeMs).ToArray();
-        var attack = kept.Select(t => Attack(mono, rate, t + 22)).ToArray();
+        var scratch = new Scratch();
+        var attack = kept.Select(t => Attack(mono, rate, t + 22, scratch)).ToArray();
         var wobble = new List<double>();
         for (int k = 1; k + 1 < kept.Length; k++)
         {
@@ -43,20 +44,38 @@ public static class DrumWobble
     private const double Half = 25, MinRiseDb = 12, Pad = 100;
 
     /// <summary>The attack (ms) nearest <paramref name="centreMs"/>, or null without a clear one.</summary>
-    internal static double? Attack(double[] mono, double rate, double centreMs)
+    internal static double? Attack(double[] mono, double rate, double centreMs) => Attack(mono, rate, centreMs, new Scratch());
+
+    /// <summary>Buffers reused from beat to beat: a 250 ms window is just over the large object heap's 85 KB, so fresh
+    /// arrays per beat were ~0.5 GB of large-object garbage on a 5-minute song.</summary>
+    private sealed class Scratch
+    {
+        private double[] y = [], z = [], sum = [], db = [];
+        private static double[] Fit(ref double[] a, int n) => a.Length >= n ? a : a = new double[n];
+        public double[] Y(int n) => Fit(ref y, n);
+        public double[] Z(int n) => Fit(ref z, n);
+        public double[] Sum(int n) => Fit(ref sum, n);
+        public double[] Db(int n) => Fit(ref db, n);
+    }
+
+    private static double? Attack(double[] mono, double rate, double centreMs, Scratch s)
     {
         // A zero-phase 1-4 kHz band of the audio around the beat, padded so the filters settle before the window.
         int from = (int)Math.Floor((centreMs - Half - Pad) * rate / 1000), to = (int)Math.Ceiling((centreMs + Half + Pad) * rate / 1000);
         if (from < 0 || to > mono.Length) return null;
-        var y = mono[from..to];
-        foreach (var f in BandFilters(rate)) { f.Run(y); Array.Reverse(y); f.Run(y); Array.Reverse(y); }
-        for (int i = 0; i < y.Length; i++) y[i] *= y[i];
+        int length = to - from;
+        var y = s.Y(length);
+        Array.Copy(mono, from, y, 0, length);
+        foreach (var f in BandFilters(rate)) { f.Run(y, length); Array.Reverse(y, 0, length); f.Run(y, length); Array.Reverse(y, 0, length); }
+        for (int i = 0; i < length; i++) y[i] *= y[i];
         // Energy smoothed by two 2 ms moving averages (a 4 ms triangle), in dB every 0.1 ms.
         int w = Math.Max(1, (int)(rate * 0.002));
-        y = Centred(Centred(y, w), w);
+        var z = s.Z(length);
+        Centred(y, z, s.Sum(length + 1), length, w);
+        Centred(z, y, s.Sum(length + 1), length, w);
         int n = (int)((to - from) * 10000.0 / rate);
-        var db = new double[n];
-        for (int i = 0; i < n; i++) db[i] = 10 * Math.Log10(y[Math.Min(y.Length - 1, (int)Math.Round(i * rate / 10000))] + 1e-12);
+        var db = s.Db(n);
+        for (int i = 0; i < n; i++) db[i] = 10 * Math.Log10(y[Math.Min(length - 1, (int)Math.Round(i * rate / 10000))] + 1e-12);
         // Candidates: 2 ms rises of at least 12 dB peaking in the window; the one followed by the loudest 15 ms wins.
         double best = double.NegativeInfinity; int at = -1;
         int lo = (int)(Pad * 10), hi = (int)((Pad + 2 * Half) * 10);
@@ -71,25 +90,25 @@ public static class DrumWobble
         return at < 0 ? null : from * 1000 / rate + at / 10.0 - 1;
     }
 
-    private static double[] Centred(double[] x, int w)
+    /// <summary>The first <paramref name="length"/> values of <paramref name="x"/> under a centred moving average of
+    /// <paramref name="w"/>, into <paramref name="y"/> (<paramref name="sum"/>: length + 1 of scratch).</summary>
+    private static void Centred(double[] x, double[] y, double[] sum, int length, int w)
     {
-        var sum = new double[x.Length + 1];
-        for (int i = 0; i < x.Length; i++) sum[i + 1] = sum[i] + x[i];
-        var y = new double[x.Length];
-        for (int i = 0; i < x.Length; i++)
+        sum[0] = 0;
+        for (int i = 0; i < length; i++) sum[i + 1] = sum[i] + x[i];
+        for (int i = 0; i < length; i++)
         {
-            int a = Math.Max(0, i - w / 2), b = Math.Min(x.Length, a + w);
+            int a = Math.Max(0, i - w / 2), b = Math.Min(length, a + w);
             y[i] = (sum[b] - sum[a]) / (b - a);
         }
-        return y;
     }
 
     private sealed class Section(double b0, double b1, double b2, double a1, double a2)
     {
-        public void Run(double[] x)
+        public void Run(double[] x, int length)
         {
             double z1 = 0, z2 = 0;
-            for (int i = 0; i < x.Length; i++)
+            for (int i = 0; i < length; i++)
             {
                 double v = x[i], o = b0 * v + z1;
                 z1 = b1 * v - a1 * o + z2;

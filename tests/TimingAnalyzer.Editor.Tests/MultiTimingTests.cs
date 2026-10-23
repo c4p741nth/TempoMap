@@ -219,6 +219,24 @@ public class MultiTimingTests
         await vm.AutoTimeAsync(Single, Multi, Drift);
         Assert.Equal(["multi", "multi", "drift 4", "single 160"], calls);
         Assert.StartsWith("Locked BPM: 160", vm.Status, StringComparison.Ordinal);
+
+        // Beat model mode: the model's red lines for the whole song, as a list (never the one-line proposal), and it
+        // says so; the BPM box still wins; without a model the mode explains itself instead of failing.
+        vm.LockedBpmText = "";
+        vm.SelectedAutoMode = EditorViewModel.BeatModelMode;
+        Assert.Equal(0, vm.DriftBeatsPerLine);
+        Task<MultiTimingDetection> Model(AudioContent a)
+        {
+            calls.Add("model");
+            return Task.FromResult(new MultiTimingDetection([new TimingPoint(351, 60000 / 150.0)], BeatModelUsed: true));
+        }
+        await vm.AutoTimeAsync(Single, Multi, Drift, Model);
+        Assert.Equal("model", calls[^1]);
+        Assert.False(vm.HasSingleProposal);
+        Assert.Single(vm.MultiProposal!.Sections);
+        Assert.Contains("Beat model mode: the model's red lines for the whole song", vm.Status);
+        await vm.AutoTimeAsync(Single, Multi, Drift);
+        Assert.Equal("The beat model is not available in this build; choose Normal.", vm.Status);
     }
 
     [Fact]

@@ -8,7 +8,7 @@ namespace TimingAnalyzer.Editor;
 /// <see cref="TimingDetection"/>).
 /// </summary>
 public sealed record MultiTimingDetection(IReadOnlyList<TimingPoint> Sections, string? Error = null, int? Status = null,
-    LiveDrumHint? LiveDrums = null);
+    LiveDrumHint? LiveDrums = null, bool BeatModelUsed = false, string? Note = null);
 
 /// <summary>The drums wobble enough from beat to beat to suggest drift mode's red line on every beat (Core DrumWobble).</summary>
 public sealed record LiveDrumHint(double WobbleMs, int Beats);

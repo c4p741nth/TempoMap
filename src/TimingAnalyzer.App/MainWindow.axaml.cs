@@ -32,6 +32,8 @@ public partial class MainWindow : Window
         // The size to remember is the last one the window had before it was maximised.
         SizeChanged += (_, e) => { if (WindowState == WindowState.Normal) normalSize = e.NewSize; };
         Closing += (_, _) => SaveSettings();
+        // A key released while another window had the focus never reaches this one.
+        Deactivated += (_, _) => model.ArrowUp();
         // Avalonia 12 TopLevel.RequestAnimationFrame(Action<TimeSpan>), verified in cached XML.
         Opened += (_, _) => RequestAnimationFrame(UpdateFrame);
         Closed += (_, _) => { closed = true; model.Dispose(); };
@@ -40,6 +42,10 @@ public partial class MainWindow : Window
         // them: otherwise Space would press the last clicked button again instead of playing.
         AddHandler(KeyDownEvent, HandleTransportKey, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, SwallowSpaceUp, RoutingStrategies.Tunnel);
+        // A .osu or an audio file dropped anywhere on the window opens it, as File → Open does.
+        AddHandler(DragDrop.DragEnterEvent, DragOverFiles);
+        AddHandler(DragDrop.DragOverEvent, DragOverFiles);
+        AddHandler(DragDrop.DropEvent, DropFiles);
         // After every layout pass, not on SizeChanged: there the slider and status heights could still be the old ones
         // (at 900x500 the toolbars got 117 px instead of 67, leaving the waveform 110 px).
         LayoutUpdated += (_, _) => FitPanels();
@@ -72,7 +78,7 @@ public partial class MainWindow : Window
         syncingTable = true;
         try { model.SelectRows(reds, primary); }
         finally { syncingTable = false; }
-        // A click only selects: the playhead stays where it is, so a line can be shifted onto it (To playhead).
+        // A click only selects; a double-click jumps there (TableDoubleTapped).
     }
     /// <summary>A double-click on a row jumps there.</summary>
     private void TableDoubleTapped(object? sender, TappedEventArgs e)
@@ -82,6 +88,17 @@ public partial class MainWindow : Window
     }
     private void SelectAllRows(object? sender, RoutedEventArgs e) => TimingTable.SelectAll();
     private void ExitApp(object? sender, RoutedEventArgs e) => Close();
+    /// <summary>
+    /// Esc closes a dialog as its cancel/close button does. On the tunnel, so a focused button or text does not take the
+    /// key first; <paramref name="result"/> is what ShowDialog returns (false for the confirm dialog's Cancel).
+    /// </summary>
+    internal static void CloseOnEscape(Window dialog, object? result = null) =>
+        dialog.AddHandler(KeyDownEvent, (_, e) =>
+        {
+            if (e.Key != Key.Escape || e.KeyModifiers != KeyModifiers.None) return;
+            e.Handled = true;
+            dialog.Close(result);
+        }, RoutingStrategies.Tunnel);
     private async void ShowKeys(object? sender, RoutedEventArgs e)
     {
         var close = new Button { Content = "Close" };
@@ -89,19 +106,26 @@ public partial class MainWindow : Window
             CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, Icon = Icon };
         var panel = new StackPanel { Margin = new Thickness(20), Spacing = 10 };
         panel.Children.Add(new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, Text =
-            "Space: play / pause\n←/→: step the playhead by the beat snap\nWheel: scroll · Ctrl+wheel: zoom · Click: seek\n" +
-            "Drag a red line: move it · Ctrl+drag a beat: stretch the BPM\nDrag an empty area: box-select red lines (Shift+drag adds)\n" +
-            "Ctrl+P or Insert: red line at the playhead · Delete: delete the selected red lines\n" +
+            "Space: play / pause\n←/→: step the playhead by the beat snap · hold past 0.3 s and it runs on, faster the longer you hold (like Audacity)\n" +
+            "Wheel: scroll · Ctrl+wheel: zoom · Click: seek\n" +
+            "Drag a red line: move it · Ctrl+drag a beat: stretch the BPM\nDrag an empty area: box-select red lines\n" +
+            "Ctrl+P or Insert: add a timing point here (a new red line at the playhead) · Delete: delete the selected red lines\n" +
+            "Ctrl+Shift+P: move the selected red line onto the playhead · Drop a .osu or an audio file on the window: open it\n" +
+            "Shift+←/→ or Shift+drag: highlight a range · Ctrl+R: auto-time the range · Esc: clear the range, then the selection\n" +
+            "Ctrl+V: paste timing points (Ctrl+Shift+V replaces all red lines)\n" +
+            "Ctrl+K: check sections (marks the ones worth a listen) · Ctrl+L: fill a ramp between the selected red lines\n" +
             "Timing table: click selects, double-click jumps, Ctrl+click adds, Shift+click selects a range\n" +
             "Ctrl+A: select every row · Ctrl+C: copy the selected rows · Esc: clear the selection\n" +
             "Ctrl+Z / Ctrl+Y: undo / redo · Ctrl+O: open .osu · Ctrl+Shift+O: open audio · Ctrl+S: save\n" +
-            "Ctrl+T: auto-time · Ctrl+Enter: apply the proposal · Ctrl+Shift+P: move the selected lines to the playhead\n" +
-            "Ctrl+←/→: shift the selected lines 1 ms (Ctrl+Shift: 5 ms) · M: metronome · F: follow\n" +
+            "Ctrl+T: auto-time · Ctrl+Enter: apply the proposal\n" +
+            "Ctrl+←/→: shift the selected lines 1 ms (Ctrl+Shift: 5 ms) · Ctrl+↑/↓: tune their BPM by the step in the Shift row (Ctrl+Shift: ten steps)\n" +
+            "M: metronome · F: follow · Esc: close this window and the other dialogs\n" +
             "Ctrl+Shift+C: copy all timing points · Ctrl+Shift+N: copy normalized (osu!mania) · F1: this list" });
         panel.Children.Add(new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, Opacity = 0.8, Text =
-            "Waveform: red = red line, purple = bar line, gray = beat, dim = beat-snap tick, orange = selected, yellow = playhead." });
+            "Waveform: red = red line, purple = bar line, gray = beat, dim = beat-snap tick, orange = selected, yellow = playhead, blue band = range, violet band = section worth a listen." });
         panel.Children.Add(close); dialog.Content = panel;
         close.Click += (_, _) => dialog.Close();
+        CloseOnEscape(dialog);
         await dialog.ShowDialog(this);
     }
     private void QueueTableSync()
@@ -182,7 +206,7 @@ public partial class MainWindow : Window
     {
         ApplySettings(new EditorSettings());
         SaveSettings();
-        model.ReportError("Settings restored to their defaults (volumes, metronome, follow, speed, beat snap, auto-time mode, table tab, window size).");
+        model.ReportError("Settings restored to their defaults (volumes, metronome, follow, speed, beat snap, shift steps, BPM step, auto-time mode and choices, table tab, window size).");
     }
     private static bool InTextBox(KeyEventArgs e) =>
         e.Source is TextBox || e.Source is Visual v && v.GetVisualAncestors().OfType<TextBox>().Any();
@@ -190,9 +214,23 @@ public partial class MainWindow : Window
     {
         if (InTextBox(e) || model.IsBusy) return;
         if (e.Key == Key.Space) { model.TogglePlay(); e.Handled = true; }
+        // ←/→: one beat-snap step, and held past 300 ms the playhead runs on, faster the longer (EditorViewModel.ArrowDown);
+        // the OS key repeats only tell it the key is still down.
         else if (e.Key is Key.Left or Key.Right && e.KeyModifiers == KeyModifiers.None)
         {
-            model.StepSnap(e.Key == Key.Right ? 1 : -1);
+            model.ArrowDown(e.Key == Key.Right ? 1 : -1);
+            e.Handled = true;
+        }
+        // Shift+←/→: the same, highlighting from where the Shift steps began (Auto-time range).
+        else if (e.Key is Key.Left or Key.Right && e.KeyModifiers == KeyModifiers.Shift)
+        {
+            model.ArrowDown(e.Key == Key.Right ? 1 : -1, extend: true);
+            e.Handled = true;
+        }
+        // Ctrl+↑/↓: tune the selected red lines' BPM by the step in the Shift row (Ctrl+Shift: ten steps).
+        else if (e.Key is Key.Up or Key.Down && e.KeyModifiers is KeyModifiers.Control or (KeyModifiers.Control | KeyModifiers.Shift))
+        {
+            model.NudgeBpm(e.Key == Key.Up ? 1 : -1, e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 10 : 1);
             e.Handled = true;
         }
         // Before the table or a button takes them: Ctrl(+Shift)+←/→ shift the selected red lines 1 (5) ms.
@@ -208,6 +246,8 @@ public partial class MainWindow : Window
     private void SwallowSpaceUp(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Space && !InTextBox(e)) e.Handled = true;
+        // The held ←/→ ends with its own key going up, whatever modifiers are down by then.
+        else if (e.Key is Key.Left or Key.Right) model.ArrowUp(e.Key == Key.Right ? 1 : -1);
     }
     private void UpdateFrame(TimeSpan timestamp)
     {
@@ -225,17 +265,39 @@ public partial class MainWindow : Window
             {
                 Title = osu ? "Open osu! beatmap" : "Open audio", AllowMultiple = false,
                 FileTypeFilter = [new FilePickerFileType(osu ? "osu! beatmap" : "Audio")
-                { Patterns = osu ? ["*.osu"] : ["*.mp3", "*.ogg", "*.wav", "*.flac", "*.mp4"] }]
+                { Patterns = osu ? ["*.osu"] : [.. EditorViewModel.AudioExtensions.Select(extension => "*" + extension)] }]
             });
             string? path = files.FirstOrDefault()?.TryGetLocalPath();
             if (path is not null) await model.LoadAsync(path);
         }
         catch (Exception ex) { model.ReportError(ex.Message); }
     }
-    private readonly CoreTiming timing = new();
-    private Task<TimingDetection> Detect(AudioContent audio, TimingRequest request) => Task.Run(() => timing.Detect(audio, request));
-    private async void AutoTime(object? sender, RoutedEventArgs e) => await model.AutoTimeAsync(Detect,
-        audio => Task.Run(() => timing.DetectMulti(audio)), (audio, beats) => Task.Run(() => timing.DetectDrift(audio, beats)));
+    private static List<string> DroppedPaths(DragEventArgs e) =>
+        e.DataTransfer.TryGetFiles()?.Select(file => file.TryGetLocalPath()).OfType<string>().ToList() ?? [];
+    private void DragOverFiles(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = !model.IsBusy && DroppedPaths(e).Any(EditorViewModel.CanOpen) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+    private async void DropFiles(object? sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        try { await model.OpenDroppedAsync(DroppedPaths(e)); }
+        catch (Exception ex) { model.ReportError(ex.Message); }
+    }
+    private readonly CoreTiming coreTiming = new();
+    /// <summary>The analysis with the Settings menu's choices (read here, on the UI thread, before the work moves to a thread).</summary>
+    private CoreTiming Timing
+    {
+        get { coreTiming.AlignToEdge = model.AlignToEdge; coreTiming.StartOnBar = model.StartOnBar; return coreTiming; }
+    }
+    private Task<TimingDetection> Detect(AudioContent audio, TimingRequest request) { var t = Timing; return Task.Run(() => t.Detect(audio, request)); }
+    private async void AutoTime(object? sender, RoutedEventArgs e)
+    {
+        var t = Timing;
+        await model.AutoTimeAsync(Detect, audio => Task.Run(() => t.DetectMulti(audio)),
+            (audio, beats) => Task.Run(() => t.DetectDrift(audio, beats)), audio => Task.Run(() => t.DetectBeatModel(audio)));
+    }
     private async Task ApplyMulti()
     {
         if (model.MultiProposal is not { } pending) { model.ReportError("Run Auto-time first."); return; }
@@ -251,9 +313,27 @@ public partial class MainWindow : Window
     }
     /// <summary>The one Apply button: the one-line proposal (with its edited offset) or the list of red lines.</summary>
     private async void AutoTimeSection(object? sender, RoutedEventArgs e) => await model.AutoTimeSectionAsync(Detect);
+    private async void AutoTimeRange(object? sender, RoutedEventArgs e) =>
+        await model.AutoTimeRangeAsync((audio, request) => { var t = Timing; return Task.Run(() => t.DetectRange(audio, request)); });
+    private async void PasteRows(object? sender, RoutedEventArgs e) => await PasteFromClipboard(false);
+    private async void PasteReplacing(object? sender, RoutedEventArgs e) => await PasteFromClipboard(true);
+    private async Task PasteFromClipboard(bool replaceAll)
+    {
+        try
+        {
+            if (Clipboard is null) throw new IOException("Clipboard unavailable.");
+            string? text = await Clipboard.TryGetTextAsync();
+            if (string.IsNullOrWhiteSpace(text)) { model.ReportError("The clipboard holds no text to paste."); return; }
+            if (replaceAll && !await Confirm("Replace all red lines?", "Replace every red line with the pasted ones? Green lines are kept, and one undo restores the old timing.")) return;
+            model.Paste(text, replaceAll);
+        }
+        catch (Exception ex) { model.ReportError("Paste failed: " + ex.Message); }
+    }
     private async void FitOffset(object? sender, RoutedEventArgs e) => await model.FitOffsetAsync(Detect);
+    private async void CheckSections(object? sender, RoutedEventArgs e) =>
+        await model.CheckSectionsAsync((audio, reds) => { var t = Timing; return Task.Run(() => t.CheckSections(audio, reds)); });
     private async void SnapToOnsets(object? sender, RoutedEventArgs e) =>
-        await model.SnapToOnsetsAsync((audio, queries) => Task.Run(() => timing.FindOnsets(audio, queries)));
+        await model.SnapToOnsetsAsync((audio, queries) => { var t = Timing; return Task.Run(() => t.FindOnsets(audio, queries)); });
     private async void ApplyAutoTime(object? sender, RoutedEventArgs e)
     {
         try
@@ -266,7 +346,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) { model.ReportError("Enter a valid proposal offset: " + ex.Message); }
     }
-    /// <summary>The release this build is ("20261018.0"), from the App project's InformationalVersion.</summary>
+    /// <summary>The release this build is ("20261019.2"), from the App project's InformationalVersion.</summary>
     public static string Version => typeof(MainWindow).Assembly
         .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
         .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion ?? "dev";
@@ -294,6 +374,7 @@ public partial class MainWindow : Window
             catch (Exception ex) { model.ReportError(ex.Message); }
         };
         close.Click += (_, _) => dialog.Close();
+        CloseOnEscape(dialog);
         await dialog.ShowDialog(this);
     }
     private async Task<bool> Confirm(string title, string message)
@@ -313,6 +394,7 @@ public partial class MainWindow : Window
         });
         panel.Children.Add(buttons); dialog.Content = panel;
         yes.Click += (_, _) => dialog.Close(true); no.Click += (_, _) => dialog.Close(false);
+        CloseOnEscape(dialog, false); // Esc is Cancel
         return await dialog.ShowDialog<bool>(this);
     }
     private async void CopyTiming(object? sender, RoutedEventArgs e)
@@ -363,17 +445,21 @@ public partial class MainWindow : Window
         bool plain = e.KeyModifiers == KeyModifiers.None;
         if (e.Key == Key.O && ctrl) { _ = Open(!shift); e.Handled = true; }
         else if (e.Key == Key.T && ctrl) { AutoTime(this, new RoutedEventArgs()); e.Handled = true; }
-        else if (e.Key == Key.P && ctrl && shift) { model.MoveToPlayhead(); e.Handled = true; }
         else if (e.Key == Key.C && ctrl && shift) { CopyTiming(this, new RoutedEventArgs()); e.Handled = true; }
         else if (e.Key == Key.N && ctrl && shift) { CopyNormalized(this, new RoutedEventArgs()); e.Handled = true; }
         else if (e.Key == Key.F1) { ShowKeys(this, new RoutedEventArgs()); e.Handled = true; }
         else if (e.Key == Key.M && plain) { model.ClickEnabled = !model.ClickEnabled; e.Handled = true; }
         else if (e.Key == Key.F && plain) { model.FollowPlayhead = !model.FollowPlayhead; e.Handled = true; }
         else if (e.Key == Key.S && ctrl) { SaveOsu(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (e.Key == Key.P && ctrl && shift) { model.MoveToPlayhead(); e.Handled = true; }
         else if (e.Key == Key.Insert || e.Key == Key.P && ctrl) { model.Insert(); e.Handled = true; }
         else if (e.Key == Key.Delete) { model.Delete(); e.Handled = true; }
         else if (e.Key == Key.A && ctrl) { TimingTable.SelectAll(); e.Handled = true; }
         else if (e.Key == Key.C && ctrl) { _ = CopySelectedRows(); e.Handled = true; }
+        else if (e.Key == Key.V && ctrl) { _ = PasteFromClipboard(shift); e.Handled = true; }
+        else if (e.Key == Key.R && ctrl) { AutoTimeRange(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (e.Key == Key.K && ctrl) { CheckSections(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (e.Key == Key.L && ctrl) { model.FillRamp(); e.Handled = true; }
         else if (e.Key == Key.Z && ctrl) { model.Undo(); e.Handled = true; }
         else if (e.Key == Key.Y && ctrl) { model.Redo(); e.Handled = true; }
         else if (e.Key == Key.Escape) { model.Escape(); e.Handled = true; }

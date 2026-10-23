@@ -1,9 +1,8 @@
-# Redline
+# Tempomap
 
-**Redline** is a timing editor for osu! by **C4P741N**: auto-timing for steady, multi-BPM and live-played songs
+**Tempomap** is a timing editor for osu! by **C4P741N**: auto-timing for steady, multi-BPM and live-played songs
 (down to a red line on every drum hit), bar lines, a timing table like osu!'s, and normalised slider velocity for
-osu!mania. Download it from [Releases](https://github.com/c4p741nth/redline/releases) (Windows x64, no .NET install
-needed) and run `Redline.exe`. MIT licensed (see `LICENSE`); audio goes through BASS by un4seen, which is free for
+osu!mania. Download it from the Releases page (Windows x64, no .NET install needed) and run `Tempomap.exe`. MIT licensed (see `LICENSE`); audio goes through BASS by un4seen, which is free for
 non-commercial use.
 
 It started as a C# engine and Windows CLI rebuilding **TimingAnlyz 0.32.4 alpha**, with its recovered
@@ -127,7 +126,7 @@ tests/parity-songs.tsv     machine-specific development and held-out audio paths
 docs/ALGORITHM.md          recovered algorithm (observed / inferred / unknown marked)
 docs/FUNCTION-MAP.md       address → role, recovered signatures, CRT helper identities
 src/TimingAnalyzer.Core/coefficients.json  all biquad tables + checked scalar constants (extracted)
-src/TimingAnalyzer.App/    the Redline editor (Avalonia)
+src/TimingAnalyzer.App/    the Tempomap editor (Avalonia)
 tools/extract_coefficients.py   re-extracts coefficients from the exe (bytes only, never executes it)
 reference/timing_analyzer.py    faithful Python port of the spec (parity-verified)
 tools/parity.py                 runs original vs Python or external CLI and compares output
@@ -187,20 +186,22 @@ Note that the original writes status lines and the timeline to **stderr**, and o
 
 ## Phase 1 desktop timing editor
 
-Timing Analyzer is made by **C4P741N**; **Help → About Redline** shows the version (releases are named
+Timing Analyzer is made by **C4P741N**; **Help → About Tempomap** shows the version (releases are named
 vYYYYMMDD.n) and credits.
 
-The window has a menu bar (**File**: open, save, copy timing points, copy normalized; **Edit**: undo/redo, insert,
-delete, select and copy rows; **Timing**: auto-time and apply, move to playhead, ms shifts and the per-line tools;
+The window has a menu bar (**File**: open, save, copy timing points, copy normalized; **Edit**: undo/redo, add or
+move a timing point here, delete, select, copy and paste rows; **Timing**: auto-time and apply, auto-time range, ms shifts
+and the per-line tools;
 **Settings**: metronome, follow, restore default settings; **Help**: keys and colours (F1), about). Under it are
 three toolbars: playback (Play / Pause, Follow, beat snap, speed, metronome and music volume), Auto-time (mode, BPM
-box and, while a proposal waits, its offset and **Apply...**) and Shift (beat and ms buttons, **To playhead**). The
-editor remembers volumes, metronome, follow, speed, beat snap, auto-time mode, table tab and window size between
-runs (`%APPDATA%\Redline\settings.json`); **Settings → Restore default settings** resets them.
+box and, while a proposal waits, its offset and **Apply...**) and Shift (❮ step ❯ for beats and for ms, the step picked in a drop-down). The
+editor remembers volumes, metronome, follow, speed, beat snap, shift steps, auto-time mode, table tab and window size between
+runs (`%APPDATA%\Tempomap\settings.json`), with the BPM step and the two Auto-time choices; **Settings → Restore default settings** resets them.
 
 Shortcuts: Ctrl+O open .osu, Ctrl+Shift+O open audio, Ctrl+S save, Ctrl+Shift+C copy timing points, Ctrl+Shift+N
-copy normalized, Ctrl+T auto-time, Ctrl+Enter apply, Ctrl+Shift+P move the selected lines to the playhead,
-Ctrl+←/→ shift them 1 ms (Ctrl+Shift+←/→ 5 ms), M metronome, F follow, F1 the full list.
+copy normalized, Ctrl+T auto-time, Ctrl+Enter apply, Ctrl+R auto-time range, Ctrl+V paste timing points
+(Ctrl+Shift+V replacing all red lines), Ctrl+K check sections, Ctrl+L fill a ramp, Ctrl+P add a timing point at the playhead (Ctrl+Shift+P move the selected one there), Ctrl+←/→ shift the selected lines 1 ms (Ctrl+Shift+←/→ 5 ms), Ctrl+↑/↓ tune their BPM by the step in the Shift row (Ctrl+Shift: ten steps), Shift+←/→ highlight
+a range by the beat snap, M metronome, F follow, F1 the full list. Esc closes the Keys, About and confirm windows.
 
 The Avalonia editor opens audio or an osu! `.osu` beatmap, displays waveform peaks and a section-aware
 beat grid, and plays audio with a metronome at 1.0, 0.75 or 0.5 speed with pitch preserved. It supports
@@ -217,13 +218,13 @@ dotnet build -c Release --no-restore
 dotnet run --project src/TimingAnalyzer.App -c Release --no-build --no-restore
 ```
 
-Open a map beside its audio file. Click to seek, Space to play/pause, Ctrl+wheel to zoom, and wheel or
+Open a map beside its audio file (File → Open, or drop the `.osu` or an audio file anywhere on the window). Click to seek, Space to play/pause, Ctrl+wheel to zoom, and wheel or
 the bottom slider to scroll. Drag a red line to move its offset; Ctrl+drag a later beat to stretch BPM
-with the section start fixed. Insert or Ctrl+P adds a red line at the playhead, Delete removes the
-selected lines, and Ctrl+Z/Ctrl+Y undo/redo. The side panel also accepts time, BPM and meter edits via
-Apply fields. Clicking a row in the timing table only selects it (the playhead stays, so the line can be moved
-onto it with **To playhead**); double-clicking jumps there (playhead on the line, line one third from the
-left); while playing with Follow on, the list selects and scrolls to the red line under the playhead. Space
+with the section start fixed. **+** (Insert or Ctrl+P, "add timing point here") adds a red line at the playhead,
+**⇥** (Ctrl+Shift+P, "move timing point here") moves the selected red line onto the playhead instead (other selected
+lines move with it, keeping their spacing; one undo step), **−** (Delete) removes the selected lines, and Ctrl+Z/Ctrl+Y undo/redo. The side panel also accepts time, BPM and
+meter edits, applied with **✓**. Clicking a row in the timing table only selects it (the playhead stays);
+double-clicking jumps there (playhead on the line, line one third from the left); while playing with Follow on, the list selects and scrolls to the red line under the playhead. Space
 always plays/pauses, even right after clicking another button (only text boxes keep it). The loaded song's
 "Artist - Title [Difficulty] (Mapper)" (or the audio file name) heads the window.
 
@@ -231,9 +232,12 @@ The time below the waveform reads like the osu! editor, `mm:ss:ms / mm:ss:ms` (p
 `00:01:531` is the same instant as offset 1531. **Beat snap** (1/1–1/9, 1/12, 1/16,
 default 1/4) sets the dim grid ticks, and **←/→** step the playhead to the previous/next tick of the
 section under it, landing on red lines when crossing them. The view scrolls to keep the playhead on screen.
+Hold ←/→ past 0.3 s and the playhead runs on, faster the longer you hold (like Audacity's cursor keys: 0.3 views per
+second at first, doubling every 0.7 s up to 4); the sound is paused during the run and seeks to the head when the key
+goes up, playing on if it was playing. Shift+←/→ held extends the highlighted range the same way.
 
-Drag across empty waveform space to box-select every red line in that band (Shift+drag adds to the
-selection, Ctrl+A selects all, Esc clears). Selected lines are orange in the waveform and marked ● in the
+Drag across empty waveform space to box-select every red line in that band (Ctrl+click in the timing table adds
+to the selection, Ctrl+A selects all, Esc clears; Shift+drag highlights a range instead, see Auto-time range). Selected lines are orange in the waveform and marked ● in the
 list; the fields edit the highlighted row. A plain click still seeks.
 
 **osu! precision.** osu! takes red-line offsets as whole ms and BPM with three decimals, so every value the
@@ -253,14 +257,49 @@ slider scrolling while playing pauses follow: scrolled **ahead**, it resumes by 
 reaches one third of that view (no jump); scrolled **back**, the view stays so you can look back. A click
 to seek, ←/→, Play or an off/on toggle of Follow resumes it at once. Pausing leaves the view in place.
 
-The Shift group moves the selected red lines (pick them in the timing table or box-select them; Ctrl+A for all) by −1, −½, −¼, −⅛, +⅛, +¼, +½ or +1 beat,
-or nudges by −5, −1, +1 or +5 ms. Beat shifts use each red line's own beat length, and each moved line
+The Shift group moves the selected red lines (pick them in the timing table or box-select them; Ctrl+A for all) one step earlier (**❮**) or
+later (**❯**): the beat step is 1/1, 1/2, 1/4, 1/8, 1/16 or 1/32 of a beat, the ms step 1, 2, 5, 10, 20 or 50 ms, each
+picked in the drop-down between the arrows. Beat shifts use each red line's own beat length, and each moved line
 then lands on a whole ms. Each press is one undo step; negative times are allowed.
 **Green lines (inherited SV/sample changes) stay fixed.** A shift that would make a red line cross or
 touch an unmoved neighbour (or reorder lines) is rejected with a status message and leaves timing
-unchanged; selected lines may move past each other's old positions. **To playhead** (Ctrl+Shift+P) moves the
-selected lines by the distance from the line clicked last to the playhead, so that line lands on the playhead:
-place the playhead on the hit by ear or with ←/→, click the line in the table, then press it.
+unchanged; selected lines may move past each other's old positions.
+
+**Beat model.** Normal-mode Auto-time also runs a small neural network (0.48 M parameters, `Models\beatnet.onnx`
+beside the exe, about 2 s per 4-minute song on the CPU) trained on the ranked and loved maps in the local osu!.db, which
+marks where mappers put beats. A rule chosen on 126 songs the network never trained on uses its red lines instead of the
+analyzer's when the two disagree on most beats, the network's beats sit on onsets clearly more often, and it hears a
+tempo change; the status line says so. On the evaluation sets no set got worse and 7 of 10 better (hard multi-BPM sets:
+0.489 → 0.553, 0.557 → 0.609, 0.647 → 0.692 aligned). The **Beat model** mode (beside Normal) uses the network's red
+lines for the whole song, for hard songs Normal keeps on the analyzer (Camellia - Parallel Universe Shifter: network
+0.585, analyzer 0.296); listen to the result. Training: `tools/beatnet/` and `docs/PHASE4-STATUS.md`.
+
+**Check and fix** (right panel) is for after auto-time. **Check sections** (Ctrl+K) scores every red line's section
+against the onsets and marks the ones worth a listen with a violet band (and selects them in the table): the line's
+beats sit on no more onset than the section's average, or the same tempo fits clearly better 25 ms or more away. On
+mappers' own timing it marks about one section in ten (0.09-0.25 per section over 1 059 sections of the evaluation
+sets), so a mark means "listen", not "wrong"; it marks Ill's 131 722 (the drums 45 ms earlier) and Parallel Universe
+Shifter's 283 730 @ 250 (a quarter beat off the onsets). It also says when maps of songs like this one usually write
+another octave ("maps usually write ÷2 (188 BPM)"), from a model trained on the ranked and loved maps in the local
+osu!.db; it never changes the timing by itself: press the button it names. **×2 / ÷2 / ×1.5 / ×⅔** (more under Timing → Tempo of
+selected lines) multiply the BPM of the selected red lines and keep their times, for a section timed at the wrong
+octave or ratio: 5 of the 30 single-BPM test songs come out at double or half the map's BPM. **Fill ramp** (Ctrl+L)
+puts a red line on every beat between the selected red lines, the BPM moving in a straight line from one to the next,
+as ranked maps write long accelerandos; where the music holds a tempo or jumps midway, select that line too and each
+part is filled. On Parallel Universe Shifter's 111 → 175 accelerando, given the start, the end and the lines at its
+two holds and its one jump, it writes all 56 of the map's ramp lines within 10 ms and 1.5 BPM.
+
+**Auto-time range** re-times part of the song. Highlight the part first: Shift+drag across the waveform (also over a
+red line), or Shift+←/→, which step the playhead by the beat snap and highlight from where the Shift steps began.
+Esc clears the range. Then **Auto-time range** (right panel, Ctrl+R) analyzes only that part: its red lines are
+replaced by what it finds there, a tempo change inside it gets its own red line, the BPM box locks one line at that
+BPM, and a drift mode puts drift lines in it. The music after the range keeps its timing: the red line in effect at
+its end continues from its first beat after it. One undo step; the new lines are selected. Use it where whole-song
+Auto-time went wrong. On a crowd of rebellion - Ill, whole-song Auto-time gives the 142 BPM part (131.7-169.7 s) as
+189.3 BPM followed by a false ramp; a range over that part gives one 142 BPM red line on the drums. On reference
+sections where whole-song timing hit under half the beats (osu!mania and multi-BPM evaluation sets), analyzing the
+section alone raised the beats within 10 ms from 9-28 % to 30-66 %; where whole-song timing was already right it
+changed little (`timing-eval range-section`).
 
 **Auto-time** changes nothing until **Apply...** is confirmed; Apply replaces every red line in one undo step and
 keeps green lines. In **Normal** mode a steady song comes back as one red line whose offset can be edited before
@@ -268,6 +307,27 @@ Apply (the original detector's line: multi-BPM returns exactly it when it finds 
 to it is empty for detection; type a BPM (e.g. `160`) to lock it, and Auto-time proposes one red line at that BPM
 with only the offset fitted (MAMBO COMBO: detected 159.997 / 351, locked 160 / 352). **Auto-time section** and **Fit
 offset** (right panel) work on the selected red line.
+
+**Where Auto-time puts its lines.** The original detector's offset is the peak of its onset function minus 28.7 ms; on a
+sharp hit (a kick from silence) that is 15-20 ms before the first sample of the hit, which is why every Auto-time
+needed "+1/16 or +1/32 of a beat" by hand. Auto-time now measures, on the song's 150 strongest hits, how far the
+waveform's leading edge (the steepest rise of the log energy over 4 ms) sits after that peak, and puts every line
+there: 18.7 ms in the median over 161 reference songs (quartiles 13.7-20.7), 19.7 ms on ReCreate of the Red, where the
+lines then sit within 0.2 ms of the user's own on two of his sections and 6 ms on a third. Ranked maps by other mappers sit on the
+detector's convention, about 14 ms before that edge, so **Settings → Auto-time on the waveform's edge** turns it off.
+The first red line goes to the first beat of a bar that has music (**Settings → Auto-time starts on a bar line**):
+the beat model's second head predicts where mappers start bars, and on 143 held-out maps its best phase is the map's
+first red line's phase in 133; the Auto-time offset alone was the map's first red line in 22 and with this in 91, the
+rest a bar or two earlier or later. Where the BPM is known (the BPM box, Auto-time section, Fit offset, Auto-time range,
+and, in Normal, sections of 24 beats or more that the analyzer put half a beat or so off) the beat model's beat head folded at that
+BPM gives the phase instead of the original fold of the onset function, which can lock onto off-beat chugs or hats: within
+25 ms of the map's grid in 94 % of 606 reference sections against 80 %, within 50 ms in 96 % against 83 %; in Normal that
+raised aligned F10 on 8 of the 10 evaluation sets (A hold 0.809 → 0.847, C hold 0.693 → 0.799, F hold 0.608 → 0.681) and lowered none. A one-tempo answer of 200 BPM or more
+that the model hears only on every second beat is halved (Dusk 256 → 128, the map's BPM; Rebellious exorcist and
+Ragnarok show the same low ratio, and the model rule already gives their 188 and 234); where it hears them mostly on
+every second beat the status line says the map may be at half of it. ReCreate of the Red is such a case (286.0 for the user's 143): type 143 in the BPM box and Auto-time, or
+÷2 and then Fit offset; with the BPM given, its sections 143 @437, 180 @49108 and 143 @55108 come out 0.3, 3.3 and
+0.3 ms from the user's own lines.
 
 With several tempos, Normal mode proposes one red line per tempo section; the status line gives their number and
 BPM range before you commit.
@@ -315,9 +375,11 @@ bars are off, select the red line on a downbeat and press **Bar line here** (rig
 
 The **timing table** (right) has osu!'s three tabs, **All**, **Timing** and **Inherited**, with its columns (offset,
 BPM or SV, meter, sample, volume, kiai). Click a row to select it, double-click to jump there; Ctrl+click and Shift+click select several, and
-the selected red lines are what the editing tools act on. **Copy selected** (Ctrl+C) copies the selected rows, red
-and green, as timing point rows to paste into the osu! editor; Ctrl+A selects every row of the tab. Green lines are
-read-only here.
+the selected red lines are what the editing tools act on. **Copy** (Ctrl+C) copies the selected rows, red
+and green, as timing point rows to paste into the osu! editor; Ctrl+A selects every row of the tab. **Paste**
+(Ctrl+V) adds the red lines of timing point rows on the clipboard (from a .osu, the osu! editor or Copy), one at the
+time of an existing red line replacing it; Ctrl+Shift+V replaces all red lines (asks first). Green lines are
+read-only here, so pasted green rows are skipped.
 
 **Copy normalized** copies red and green lines for osu!mania with the scroll speed held constant: every red line
 gets a green line with SV = main BPM / its BPM, the main BPM being the one held longest up to the last note, as

@@ -97,7 +97,7 @@ public class ViewModelTests
     public async Task BeatmapWithoutAudioStillLoadsTimingAndResolvesRelativeFilename()
     {
         using var vm = new EditorViewModel(_ => throw new InvalidOperationException("Must not decode missing audio"), _ => new FakePlayback());
-        string path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "my-dearest-tv.osu");
+        string path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "steady-multi.osu");
         await vm.LoadAsync(path);
         Assert.NotNull(vm.Document);
         Assert.Equal(vm.Document.TimingPoints.Where(p => p.Uninherited), vm.Edits.RedLines);

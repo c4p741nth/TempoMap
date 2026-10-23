@@ -5,7 +5,7 @@ namespace TimingAnalyzer.Editor.Tests;
 
 public class PrecisionTests
 {
-    private static string FixturePath => Path.Combine(AppContext.BaseDirectory, "Fixtures", "my-dearest-tv.osu");
+    private static string FixturePath => Path.Combine(AppContext.BaseDirectory, "Fixtures", "steady-multi.osu");
 
     [Theory]
     [InlineData(0, "00:00:000")]

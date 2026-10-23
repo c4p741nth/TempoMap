@@ -12,6 +12,16 @@ public sealed record MultiBpmOptions
     public double MaxBpm { get; init; } = 400;
     /// <summary>Local tempo stays within the whole-song period divided or multiplied by this (octave anchor).</summary>
     public double OctaveRange { get; init; } = 1.6;
+    /// <summary>
+    /// Experiment, off in the editor (2026-10-21, docs/PHASE1-STATUS.md E41): octave anchor from outside the envelope,
+    /// for a slice of a song (Auto-time range: <see cref="RangeTiming.WholeSongAnchor"/>). Used only when the detector
+    /// on the slice finds no exact BPM: its approximate BPM is doubled or halved while it lies outside <see
+    /// cref="OctaveRange"/> of this one, and with no estimate at all the tracker is anchored here. It fixes Moonlit
+    /// Occultation's half-tempo ranges (≈ 120 for 206-240), but the whole song's BPM is the wrong octave for songs
+    /// whose sections differ: timing-eval range A tune 0.471 → 0.300, D tune 0.538 → 0.456. Null = the slice alone
+    /// decides.
+    /// </summary>
+    public double? AnchorBpm { get; init; }
     /// <summary>Viterbi cost of changing tempo between windows, per (ln ratio)².</summary>
     public double TempoChangeCost { get; init; } = 400;
     /// <summary>Beat DP weight of the inter-beat interval deviating from the local period (Ellis's α).</summary>
@@ -146,6 +156,20 @@ public sealed record MultiBpmOptions
     public double ThirdBeatMaxBpm { get; init; }
     /// <summary>See <see cref="ThirdBeatMaxBpm"/>: the weaker of the ⅓ and ⅔ beat peaks / the beat peak.</summary>
     public double ThirdBeatRatio { get; init; } = 0.6;
+
+    /// <summary>
+    /// One-tempo answers only: the original's BPM at or above <see cref="TripletMinBpm"/> is divided by 3 when its
+    /// onsets, folded at three beats, peak on one of the three beats and the stronger of the other two reaches at most
+    /// this share of it (the original counted the triplets of a triplet-feel song as beats: Meganeko - Judgement
+    /// 284.998 for 95, Frums - Pictured as Perfect 285 for a map at 95). 0 = off. 0.5 / 240 chosen 2026-10-19 with
+    /// `timing-eval triplet`: of the one-tempo answers of 150 BPM or more it fires on Judgement (0.344), Pictured as
+    /// Perfect (0.444) and Black Key Etude (0.476, 315 for a map at 210: 105 is half the map's BPM instead of 1.5 times
+    /// it), none of the 203 evaluation or 126 validation songs; the nearest map it would break is Fleshgod Apocalypse -
+    /// The Hypocrisy (0.628 at 250). Below 240 the measure is not safe: Veil Of Maya - Mikasa, a 220 map, gives 0.386.
+    /// </summary>
+    public double TripletRatio { get; init; } = 0.5;
+    /// <summary>See <see cref="TripletRatio"/>.</summary>
+    public double TripletMinBpm { get; init; } = 240;
 }
 
 /// <summary>One red line: osu! time of its first beat (ms, unrounded) and its BPM (unrounded unless snapped).</summary>
@@ -184,16 +208,18 @@ public static class MultiBpmAnalyzer
         var o = options ?? new MultiBpmOptions();
         // The original whole-song result: octave anchor, and the answer whenever only one tempo is found.
         var original = Analyzer.AnalyzeEnvelope(d);
-        if (original.Bpm is null && original.ApproximateBpm is { } approximate) original = Analyzer.AnalyzeEnvelope(d, approximate);
+        if (original.Bpm is null && NearAnchor(original.ApproximateBpm, o) is { } approximate) original = Analyzer.AnalyzeEnvelope(d, approximate);
         TimingSection? single = original.Bpm is { } bpm && original.Offset is { } offset ? new TimingSection(offset, bpm) : null;
         var beats = o.ExternalBeats is { } external
             ? RefineBeats(d, o.ExternalToOctave && single is not null ? ToBeatLevel(external, 60000 / single.Bpm) : external, o)
-            : TrackBeats(d, o, single?.Bpm);
+            : TrackBeats(d, o, single?.Bpm ?? o.AnchorBpm);
         if (beats.Count < o.MinSectionBeats) return new(beats, 0, [], single is null ? [] : [single]);
         var (spans, unmerged) = SectionBuilder.Sections(d, beats, o);
         var sections = SectionBuilder.Merge(d, beats, unmerged, o, single);
         // One tempo: the original's estimate over the whole song is the better one (Set B regression guard).
         IReadOnlyList<TimingSection> final = sections.Count <= 1 && single is not null ? [single] : sections;
+        if (o.TripletRatio > 0 && final.Count == 1 && single is not null)
+            final = [Triplet(d, single, beats[^1].TimeMs + 60000 / single.Bpm, o)];
         if (o.Ramps && final.Count > 1)
             final = RampBridge.Fill(d, final, beats[^1].TimeMs + 60000 / final[^1].Bpm, o);
         if (o.FreeTempo && final.Count > 0)
@@ -210,6 +236,19 @@ public static class MultiBpmAnalyzer
         return new(beats, spans, unmerged, final);
     }
 
+    /// <summary>
+    /// The detector's approximate BPM, doubled or halved while it lies outside <see cref="MultiBpmOptions.OctaveRange"/>
+    /// of <see cref="MultiBpmOptions.AnchorBpm"/> (unchanged without an anchor). Moonlit Occultation (2026-10-21): the
+    /// range 105-125 s of a 206 → 240 ramp gives ≈ 119.9 on its own, while the whole song gives 240.
+    /// </summary>
+    internal static double? NearAnchor(double? approximate, MultiBpmOptions o)
+    {
+        if (approximate is not { } x || !(x > 0) || o.AnchorBpm is not { } a || !(a > 0)) return approximate;
+        while (x < a / o.OctaveRange) x *= 2;
+        while (x > a * o.OctaveRange) x /= 2;
+        return x;
+    }
+
     /// <summary>See <see cref="MultiBpmOptions.HalfTempoMaxBpm"/>. The red line keeps its time; its beats stay beats.</summary>
     internal static IReadOnlyList<TimingSection> DoubleHalfTempo(double[] d, IReadOnlyList<TimingSection> sections, double songEnd, MultiBpmOptions o) =>
         Rescale(sections, songEnd, 2, (s, length, count) =>
@@ -219,6 +258,42 @@ public static class MultiBpmAnalyzer
     internal static IReadOnlyList<TimingSection> SpeedUpDottedBeat(double[] d, IReadOnlyList<TimingSection> sections, double songEnd, MultiBpmOptions o) =>
         Rescale(sections, songEnd, 1.5, (s, length, count) =>
             1.5 * s.Bpm <= o.ThirdBeatMaxBpm && SubBeatRatio(d, s.TimeMs, length, count, [1.0 / 3, 2.0 / 3]) >= o.ThirdBeatRatio);
+
+    /// <summary>
+    /// See <see cref="MultiBpmOptions.TripletRatio"/>. The red line moves to the strongest of the three beats; the BPM
+    /// becomes the nearest whole one when that drifts at most <see cref="MultiBpmOptions.WholeBpmDriftMs"/> over the song.
+    /// </summary>
+    internal static TimingSection Triplet(double[] d, TimingSection s, double songEnd, MultiBpmOptions o)
+    {
+        var (beat, ratio) = TripletPeaks(d, s, songEnd);
+        if (s.Bpm < o.TripletMinBpm || ratio > o.TripletRatio) return s;
+        var slow = new TimingSection(s.TimeMs + beat * 60000 / s.Bpm, s.Bpm / 3);
+        return o.WholeBpmDriftMs > 0 ? WholeBpm([slow], songEnd, o.WholeBpmDriftMs)[0] : slow;
+    }
+
+    /// <summary>
+    /// Onsets folded at three beats of <paramref name="s"/> from its red line: which beat (0-2) peaks highest, and the
+    /// stronger of the other two beats' peaks over that one (each ±12 ms; 1 when nothing folds).
+    /// </summary>
+    internal static (int Beat, double Ratio) TripletPeaks(double[] d, TimingSection s, double songEnd)
+    {
+        double length = 60000 / s.Bpm, bar = 3 * length;
+        int count = (int)((songEnd - s.TimeMs) / bar), c = (int)Math.Ceiling(bar);
+        if (count < 8) return (0, 1);
+        var h = new double[c];
+        for (int k = 0; k < count; k++)
+        {
+            int a = (int)Math.Round(s.TimeMs + k * bar + PeakToOsuMs);
+            if (a < 0 || a + c > d.Length) continue;
+            for (int j = 0; j < c; j++) h[j] += Math.Max(0, d[a + j]);
+        }
+        var peaks = new double[3];
+        for (int b = 0; b < 3; b++)
+            for (int j = -12; j <= 12; j++) peaks[b] = Math.Max(peaks[b], h[(((int)Math.Round(b * length) + j) % c + c) % c]);
+        int best = Array.IndexOf(peaks, peaks.Max());
+        double other = Enumerable.Range(0, 3).Where(b => b != best).Max(b => peaks[b]);
+        return peaks[best] > 0 ? (best, other / peaks[best]) : (0, 1);
+    }
 
     /// <summary>Multiplies the BPM of each section of at least 8 beats for which <paramref name="test"/> holds.</summary>
     private static IReadOnlyList<TimingSection> Rescale(IReadOnlyList<TimingSection> sections, double songEnd, double factor,

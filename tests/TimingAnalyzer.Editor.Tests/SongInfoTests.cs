@@ -9,10 +9,10 @@ public class SongInfoTests
     [Fact]
     public void MetadataNamesTheSong()
     {
-        var doc = OsuFile.Load(Fixture("m1ll10n-pp.osu"));
-        Assert.Equal("Camellia", doc.Metadata["Artist"]);
-        Assert.Equal("かめりあ", doc.Metadata["ArtistUnicode"]);
-        Assert.Equal("Camellia - M1LLI0N PP [DOM1NATI0N] (Hydria)", doc.SongTitle);
+        var doc = OsuFile.Load(Fixture("ramp-mania.osu"));
+        Assert.Equal("Tempomap Fixtures", doc.Metadata["Artist"]);
+        Assert.Equal("テンポマップ", doc.Metadata["ArtistUnicode"]);
+        Assert.Equal("Tempomap Fixtures - Synthetic Ramp [Ramp] (Tempomap tests)", doc.SongTitle);
         Assert.Null(OsuFile.Parse("[General]\nAudioFilename: a.mp3\n"u8.ToArray()).SongTitle);
         Assert.Equal("Unknown - Untitled [Timing] (Timing Analyzer)", OsuFile.Create("song.ogg").SongTitle);
     }
@@ -22,10 +22,10 @@ public class SongInfoTests
     {
         using var vm = new EditorViewModel(_ => throw new InvalidOperationException(), _ => new ViewModelTests.FakePlayback());
         Assert.Equal("No song loaded", vm.SongTitle);
-        Assert.Equal("Redline - timing editor for osu! by C4P741N", vm.WindowTitle);
-        await vm.LoadAsync(Fixture("my-dearest-tv.osu"));
-        Assert.Equal("supercell - My Dearest (TV Size) [Bandusty's Insane] (-[ Peachy ]-)", vm.SongTitle);
-        Assert.Equal(vm.SongTitle + " - Redline by C4P741N", vm.WindowTitle);
+        Assert.Equal("Tempomap - timing editor for osu! by C4P741N", vm.WindowTitle);
+        await vm.LoadAsync(Fixture("steady-multi.osu"));
+        Assert.Equal("Tempomap Fixtures - Synthetic Steady [Many Red Lines] (Tempomap tests)", vm.SongTitle);
+        Assert.Equal(vm.SongTitle + " - Tempomap by C4P741N", vm.WindowTitle);
 
         string audio = Path.Combine(Path.GetTempPath(), "timing-" + Guid.NewGuid().ToString("N") + ".ogg");
         File.WriteAllBytes(audio, []);

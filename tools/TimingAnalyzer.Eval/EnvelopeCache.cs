@@ -22,7 +22,9 @@ public static class EnvelopeCache
     /// </summary>
     public static double[]? ExternalBeats(string audio, string cacheDir)
     {
-        string file = Path.Combine(cacheDir, Key(audio) + ".beats");
+        // TIMING_EVAL_BEATS names a subfolder of the cache (one per beat source: beatnet, beats-thisprobe, ...).
+        string dir = Environment.GetEnvironmentVariable("TIMING_EVAL_BEATS") is { Length: > 0 } sub ? Path.Combine(cacheDir, sub) : cacheDir;
+        string file = Path.Combine(dir, Key(audio) + ".beats");
         if (!File.Exists(file)) return null;
         return File.ReadLines(file).Where(l => l.Trim().Length > 0)
             .Select(l => double.Parse(l.Split('	', ' ')[0], System.Globalization.CultureInfo.InvariantCulture) * 1000).ToArray();

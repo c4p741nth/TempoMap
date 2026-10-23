@@ -2,6 +2,7 @@
 //   timing-eval select <songsDir> <out.tsv> [multiCount] [singleCount]
 //   timing-eval select-mania <songsDir> <out.tsv>
 //   timing-eval run <songs.tsv> [algorithm] [set=A|B|M|C|D] [split=tune|hold]
+//   timing-eval edge-lag|phase|bar-start|octave-beat|normal-variants|auto-time <songs.tsv>...   (docs/PHASE1-STATUS.md E43-E44)
 using System.Collections.Concurrent;
 using System.Globalization;
 using TimingAnalyzer.Editor;
@@ -42,13 +43,18 @@ var multiOptions = defaults with
     RampLinePenalty = Opt("rline", defaults.RampLinePenalty), WholeBpmDriftMs = Opt("whole", defaults.WholeBpmDriftMs),
     HalfTempoMaxBpm = Opt("hmax", defaults.HalfTempoMaxBpm), HalfTempoRatio = Opt("hratio", defaults.HalfTempoRatio),
     ThirdBeatMaxBpm = Opt("tmax", defaults.ThirdBeatMaxBpm), ThirdBeatRatio = Opt("tratio", defaults.ThirdBeatRatio),
+    TripletRatio = Opt("trip", defaults.TripletRatio), TripletMinBpm = Opt("tripmin", defaults.TripletMinBpm),
     // rshort=2 allows 2-beat ramp steps, rshort=1 also 1-beat ones (default: the library's list).
     RampStepBeats = Opt("rshort", 0) switch { 2 => [2, 4, 6, 8, 12, 16], 1 => [1, 2, 3, 4, 6, 8, 12, 16], _ => defaults.RampStepBeats },
 };
 // ext=1: beats from an outside tracker (tools/beat_probe.py, .eval-cache/<key>.beats) instead of our own; lag=ms.
 bool external = Opt("ext", 0) != 0;
 IReadOnlyList<TimingPoint> RunAlgorithm(ITimingAlgorithm algorithm, EvalSong song, double[] envelope, double duration) =>
-    !external ? algorithm.Run(envelope, duration)
+    algorithm is ModelOctaveAlgorithm ? new ModelOctaveAlgorithm(multiOptions, () => EnvelopeCache.ExternalBeats(song.Audio, cache)).Run(envelope, duration)
+    : algorithm is ModelOnlyAlgorithm ? new ModelOnlyAlgorithm(() => EnvelopeCache.ExternalBeats(song.Audio, cache)).Run(envelope, duration)
+    : algorithm is SelectedAlgorithm ? new SelectedAlgorithm(multiOptions, () => EnvelopeCache.ExternalBeats(song.Audio, cache)).Run(envelope, duration)
+    : algorithm is HybridAlgorithm ? new HybridAlgorithm(multiOptions, () => EnvelopeCache.ExternalBeats(song.Audio, cache), Opt("steady", 8000)).Run(envelope, duration)
+    : !external ? algorithm.Run(envelope, duration)
     : new MultiAlgorithm(multiOptions with
     {
         ExternalBeats = EnvelopeCache.ExternalBeats(song.Audio, cache) ?? throw new FileNotFoundException("no outside beats for " + song.Name),
@@ -67,14 +73,19 @@ var algorithms = new Dictionary<string, Func<ITimingAlgorithm>>(StringComparer.O
     ["drift4"] = () => new DriftAlgorithm(multiOptions, 4), ["drift8"] = () => new DriftAlgorithm(multiOptions, 8),
     ["drift16"] = () => new DriftAlgorithm(multiOptions, 16), ["drift32"] = () => new DriftAlgorithm(multiOptions, 32),
     ["multi"] = () => new MultiAlgorithm(multiOptions, "multi " + string.Join(" ", overrides.Select(p => p.Key + "=" + p.Value.ToString(inv)))),
+    ["octave"] = () => new OctaveAlgorithm(multiOptions, Opt("omargin", TimingAnalyzer.Core.OctaveSelector.Margin)),
+    ["modeloct"] = () => new ModelOctaveAlgorithm(multiOptions, () => null),
+    ["modelonly"] = () => new ModelOnlyAlgorithm(() => null),
+    ["selected"] = () => new SelectedAlgorithm(multiOptions, () => null),
+    ["hybrid"] = () => new HybridAlgorithm(multiOptions, () => null, Opt("steady", 8000)),
 };
 
 if (args.Length >= 3 && args[0] == "select")
 {
     int multi = args.Length > 3 ? int.Parse(args[3], inv) : 40, single = args.Length > 4 ? int.Parse(args[4], inv) : 30;
-    var extra = new[] { new EvalSong("M", "tune",
-        @"G:\osu!\Songs\beatmap-639191186438486451-Camellia - Chimera Dragons - MAMBO COMBO\audio.ogg",
-        @"G:\osu!\Songs\beatmap-639191186438486451-Camellia - Chimera Dragons - MAMBO COMBO\Camellia - MBCB (C4P741N) [Test].osu") };
+    // MAMBO COMBO (set M) was dropped on 2026-10-18 at the user's request: its reference map was re-saved in osu! from
+    // our own output, so the original timing is gone and it no longer checks anything independent.
+    var extra = Array.Empty<EvalSong>();
     var songs = SongSelection.Select(args[1], multi, single, extra);
     SongSelection.Write(args[2], songs);
     foreach (var g in songs.GroupBy(s => s.Set)) Console.WriteLine($"set {g.Key}: {g.Count()} songs ({g.Count(s => s.Split == "tune")} tune / {g.Count(s => s.Split == "hold")} hold)");
@@ -94,6 +105,55 @@ if (args.Length >= 2 && args[0] == "audio-keys")
     // timing-eval audio-keys <songs.tsv>...: cache key and audio path of every song, for tools/beat_probe.py.
     foreach (string audio in args.Skip(1).Where(a => !a.Contains('=')).SelectMany(SongSelection.Read).Select(s => s.Audio).Distinct(StringComparer.OrdinalIgnoreCase))
         Console.WriteLine(EnvelopeCache.Key(audio) + "	" + audio);
+    return 0;
+}
+if (args.Length >= 3 && args[0] == "dump-set")
+{
+    // timing-eval dump-set <songs.tsv> <outDir>: for the beat model (docs/PHASE4-PLAN.md): per song, our decoder's mono
+    // samples resampled to 22 050 Hz (float32 .pcm) and the map's red lines and last note (.json), named by the
+    // envelope cache key, so the model sees the audio the editor sees. Songs already dumped are skipped.
+    var songs = SongSelection.Read(args[1]);
+    Directory.CreateDirectory(args[2]);
+    int done = 0, skipped = 0, failed = 0;
+    Parallel.ForEach(songs, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) }, song =>
+    {
+        try
+        {
+            string key = EnvelopeCache.Key(song.Audio), pcm = Path.Combine(args[2], key + ".pcm"), meta = Path.Combine(args[2], key + ".json");
+            if (File.Exists(pcm) && File.Exists(meta)) { Interlocked.Increment(ref skipped); return; }
+            var doc = OsuFile.Load(song.Reference);
+            var reds = BeatGrid.Sort(doc.RedLines);
+            var decoded = TimingAnalyzer.Audio.AudioDecoder.Read(song.Audio);
+            if (decoded.Mono.Length / decoded.Rate > 600) return;
+            // Linear resampling to 22 050 Hz (the mel front end low-passes at 11 kHz anyway).
+            const int rate = 22050;
+            int n = (int)(decoded.Mono.LongLength * rate / (long)decoded.Rate);
+            using (var w = new BinaryWriter(File.Create(pcm + ".tmp")))
+            {
+                double step = decoded.Rate / rate;
+                for (int i = 0; i < n; i++)
+                {
+                    double x = i * step;
+                    int j = (int)x;
+                    double f = x - j, a = decoded.Mono[Math.Min(j, decoded.Mono.Length - 1)], b = decoded.Mono[Math.Min(j + 1, decoded.Mono.Length - 1)];
+                    w.Write((float)(a + (b - a) * f));
+                }
+            }
+            File.Move(pcm + ".tmp", pcm, overwrite: true);
+            string json = "{\"song\":" + System.Text.Json.JsonSerializer.Serialize(Path.GetFileName(Path.GetDirectoryName(song.Audio))) +
+                ",\"set\":" + System.Text.Json.JsonSerializer.Serialize(song.Set) +
+                string.Create(inv, $",\"rate\":{rate},\"samples\":{n},\"duration_ms\":{decoded.Mono.Length * 1000.0 / decoded.Rate:0.###}") +
+                string.Create(inv, $",\"last_note_ms\":{(doc.LastObjectTime is { } last ? last.ToString("0.###", inv) : "null")}") +
+                ",\"reds\":[" + string.Join(",", reds.Select(p => string.Create(inv,
+                    $"[{p.Time:0.###},{p.BeatLength:R},{p.Meter},{(p.OmitsFirstBarline ? 1 : 0)}]"))) + "]}";
+            File.WriteAllText(meta, json);
+            Interlocked.Increment(ref done);
+        }
+        catch (Exception ex) when (ex is IOException or FormatException or ArgumentException or InvalidOperationException) { Interlocked.Increment(ref failed); }
+        int total = done + skipped + failed;
+        if (total % 100 == 0) Console.Error.WriteLine($"{total}/{songs.Count}");
+    });
+    Console.WriteLine($"dumped {done}, already there {skipped}, failed {failed} of {songs.Count} -> {args[2]}");
     return 0;
 }
 if (args.Length >= 3 && args[0] == "dump-audio")
@@ -367,6 +427,332 @@ if (args.Length >= 2 && args[0] == "beats")
     foreach (var l in lines.OrderBy(l => l.Song.Set).ThenBy(l => l.Song.Split).ThenBy(l => l.Song.Name, StringComparer.Ordinal)) Console.WriteLine(l.Text);
     return 0;
 }
+if (args.Length >= 2 && args[0] == "range")
+{
+    // timing-eval range <songs.tsv> [set=..] [split=..] [pad=ms]: the editor's "Analyze range" around each reference
+    // tempo change (a reference red line with a BPM over 2 % from the one before, both sections at least 2 x pad long),
+    // range = change ± pad. Scored on the reference beats inside the range: the range's own red lines against the
+    // whole-song red lines there (aligned 10 ms recall, after removing each song's whole-song shift).
+    string? set = args.Skip(2).FirstOrDefault(a => a.StartsWith("set=", StringComparison.Ordinal))?[4..];
+    string? split = args.Skip(2).FirstOrDefault(a => a.StartsWith("split=", StringComparison.Ordinal))?[6..];
+    double pad = Opt("pad", 15000);
+    var songs = SongSelection.Read(args[1]).Where(s => (set is null || s.Set == set) && (split is null || s.Split == split)).ToList();
+    var found = new ConcurrentBag<(EvalSong Song, double Change, int Beats, int Whole, int Range, string Lines)>();
+    Parallel.ForEach(songs, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) }, song =>
+    {
+        var reference = BeatGrid.Sort(OsuFile.Load(song.Reference).RedLines);
+        var (envelope, duration) = EnvelopeCache.Get(song.Audio, cache);
+        if (duration > 600000) return;
+        var whole = new MultiAlgorithm(multiOptions).Run(envelope, duration);
+        if (whole.Count == 0) return;
+        double shift = GridAgreement.Score(reference, whole, duration).ShiftMs;
+        // ranchor=1: the whole song's detector BPM as the range's octave anchor (MultiBpmOptions.AnchorBpm); rpad=ms: context
+        // analyzed on each side of the range (RangeTiming.Analyze contextMs).
+        var rangeOptions = Opt("ranchor", 0) != 0 ? multiOptions with { AnchorBpm = TimingAnalyzer.Core.RangeTiming.WholeSongAnchor(envelope) } : multiOptions;
+        for (int i = 1; i < reference.Length; i++)
+        {
+            var (before, change) = (reference[i - 1], reference[i]);
+            double next = i + 1 < reference.Length ? reference[i + 1].Time : duration;
+            if (Math.Abs(change.Bpm / before.Bpm - 1) < 0.02 || change.Time - before.Time < 2 * pad || next - change.Time < 2 * pad) continue;
+            double a = change.Time - pad, b = change.Time + pad;
+            var lines = TimingAnalyzer.Core.RangeTiming.Analyze(envelope, a, b, rangeOptions, Opt("rpad", 0))
+                .Select(s => new TimingPoint(OsuPrecision.Time(s.TimeMs), 60000 / OsuPrecision.Bpm(s.Bpm))).GroupBy(p => p.Time).Select(g => g.First()).ToArray();
+            var beats = GridAgreement.Beats(reference, reference[0].Time, duration).Where(t => t >= a && t < b).ToArray();
+            int Hits(IReadOnlyList<TimingPoint> predicted)
+            {
+                if (predicted.Count == 0) return 0;
+                var aligned = predicted.Select(p => p with { Time = p.Time - shift }).ToArray();
+                return beats.Count(t => GridAgreement.Nearest(aligned, t, 1) <= 10);
+            }
+            found.Add((song, change.Time, beats.Length, Hits(whole), Hits(lines),
+                string.Join(" ", lines.Select(p => $"{p.Time:0}@{OsuPrecision.FormatBpm(p.Bpm)}"))));
+        }
+    });
+    Console.WriteLine($"range ±{pad:0} ms around reference tempo changes: aligned 10 ms recall of the reference beats in the range");
+    Console.WriteLine("set split  change ms  beats  whole  range  song / range red lines");
+    foreach (var r in found.OrderBy(r => r.Song.Set).ThenBy(r => r.Song.Split).ThenBy(r => r.Song.Name, StringComparer.Ordinal).ThenBy(r => r.Change))
+        Console.WriteLine($"{r.Song.Set,-3} {r.Song.Split,-5} {r.Change,9:0} {r.Beats,6} {r.Whole / (double)r.Beats,6:0.000} {r.Range / (double)r.Beats,6:0.000}  " +
+            $"{(r.Song.Name.Length > 40 ? r.Song.Name[..40] : r.Song.Name)} | {r.Lines}");
+    foreach (var g in found.GroupBy(r => (r.Song.Set, r.Song.Split)).OrderBy(g => g.Key.Set).ThenBy(g => g.Key.Split))
+        Console.WriteLine($"  {g.Key.Set} {g.Key.Split,-5} changes {g.Count(),3}  whole {g.Sum(r => r.Whole) / (double)g.Sum(r => r.Beats):0.000}  " +
+            $"range {g.Sum(r => r.Range) / (double)g.Sum(r => r.Beats):0.000}  range better {g.Count(r => r.Range > r.Whole + 0.1 * r.Beats),3}  " +
+            $"worse {g.Count(r => r.Range < r.Whole - 0.1 * r.Beats),3}");
+    return 0;
+}
+if (args.Length >= 3 && args[0] == "select-features")
+{
+    // timing-eval select-features <songs.tsv> <out.csv>: Phase 4 N4 per-song choice between the algorithm and the beat
+    // model's own red lines. One row per song: both aligned F10 scores (the label), and signals known without the
+    // answer: red-line counts, how far each timing's beats are from the other's (agreement), share of each timing's
+    // beats on an onset peak, the algorithm's original detector status, the model's beat count per minute, the song
+    // length, and the BPM spread of each. Model beats from the cache subfolder TIMING_EVAL_BEATS.
+    var songs = SongSelection.Read(args[1]);
+    var rows = new ConcurrentBag<string>();
+    Parallel.ForEach(songs, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) }, song =>
+    {
+        try
+        {
+            var reference = BeatGrid.Sort(OsuFile.Load(song.Reference).RedLines);
+            var (envelope, duration) = EnvelopeCache.Get(song.Audio, cache);
+            if (duration > 600000) return;
+            var beats = EnvelopeCache.ExternalBeats(song.Audio, cache);
+            if (beats is null || beats.Length < 8) return;
+            var alg = new MultiAlgorithm(multiOptions).Run(envelope, duration);
+            var model = new ModelOnlyAlgorithm(() => beats).Run(envelope, duration);
+            if (alg.Count == 0 || model.Count == 0) return;
+            double sa = GridAgreement.Score(reference, alg, duration).AlignedF10, sm = GridAgreement.Score(reference, model, duration).AlignedF10;
+            double start = Math.Max(alg[0].Time, model[0].Time), end = duration;
+            double Agree(IReadOnlyList<TimingPoint> from, IReadOnlyList<TimingPoint> to)
+            {
+                var bs = GridAgreement.Beats(from, start, end).ToArray();
+                return bs.Length == 0 ? 0 : bs.Count(t => GridAgreement.Nearest(to, t, 1) <= 10) / (double)bs.Length;
+            }
+            // Onset support: share of a timing's beats with an envelope peak within 10 ms (envelope index = osu! time + 28.7).
+            double OnPeaks(IReadOnlyList<TimingPoint> reds)
+            {
+                var bs = GridAgreement.Beats(reds, start, end).ToArray();
+                if (bs.Length == 0) return 0;
+                double mean = envelope.Average(), sd = Math.Sqrt(envelope.Average(x => (x - mean) * (x - mean)));
+                int hits = 0;
+                foreach (double t in bs)
+                {
+                    int c = (int)Math.Round(t + TimingAnalyzer.Core.MultiBpmAnalyzer.PeakToOsuMs);
+                    double best = double.MinValue;
+                    for (int j = Math.Max(0, c - 10); j <= Math.Min(envelope.Length - 1, c + 10); j++) best = Math.Max(best, envelope[j]);
+                    if (best > mean + sd) hits++;
+                }
+                return hits / (double)bs.Length;
+            }
+            double Spread(IReadOnlyList<TimingPoint> reds) => reds.Count < 2 ? 0 : Math.Log(reds.Max(p => p.Bpm) / reds.Min(p => p.Bpm));
+            var original = TimingAnalyzer.Core.Analyzer.AnalyzeEnvelope(envelope);
+            rows.Add(string.Create(inv,
+                $"{song.Set},{song.Split},{Path.GetFileName(Path.GetDirectoryName(song.Audio))?.Replace(',', ' ')},{sa:0.####},{sm:0.####}," +
+                $"{alg.Count},{model.Count},{Agree(alg, model):0.####},{Agree(model, alg):0.####},{OnPeaks(alg):0.####},{OnPeaks(model):0.####}," +
+                $"{original.Status},{beats.Length * 60000.0 / duration:0.###},{duration / 1000:0.#},{Spread(alg):0.####},{Spread(model):0.####}"));
+        }
+        catch (Exception ex) when (ex is IOException or FormatException or ArgumentException or InvalidOperationException) { }
+    });
+    using (var csv = new StreamWriter(args[2]))
+    {
+        csv.WriteLine("set,split,song,alg,model,alg_lines,model_lines,alg_in_model,model_in_alg,alg_on_peaks,model_on_peaks,orig_status,model_beats_per_min,seconds,alg_spread,model_spread");
+        foreach (var r in rows.Order(StringComparer.Ordinal)) csv.WriteLine(r);
+    }
+    Console.WriteLine($"{rows.Count} songs -> {args[2]}");
+    return 0;
+}
+if (args.Length >= 3 && args[0] == "features")
+{
+    // timing-eval features <songs.tsv> <out.csv>: training rows for the octave selector (docs/PHASE1-STATUS.md E36).
+    // One row per multi-BPM red line whose section is >= 10 s and lies inside one reference section: the detected
+    // BPM, onset features of candidate tempos (×½, ×⅔, ×¾, ×1, ×4/3, ×1.5, ×2 of it, each at its best phase), and the
+    // label = the candidate whose BPM is within 1 % of the reference's (empty if none: an unlearnable row).
+    var songs = SongSelection.Read(args[1]);
+    double[] ratios = [0.5, 2.0 / 3, 0.75, 1, 4.0 / 3, 1.5, 2];
+    var rows = new ConcurrentBag<string>();
+    int done = 0;
+    Parallel.ForEach(songs, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) }, song =>
+    {
+        try
+        {
+            var reference = BeatGrid.Sort(OsuFile.Load(song.Reference).RedLines);
+            var (envelope, duration) = EnvelopeCache.Get(song.Audio, cache);
+            if (duration > 600000 || reference.Length == 0) return;
+            var detected = TimingAnalyzer.Core.MultiBpmAnalyzer.Analyze(envelope, multiOptions);
+            for (int i = 0; i < detected.Count; i++)
+            {
+                double a = detected[i].TimeMs, b = i + 1 < detected.Count ? detected[i + 1].TimeMs : duration;
+                if (b - a < 10000) continue;
+                // The reference section covering the middle 80 % of this one, if a single one does.
+                int r0 = SectionOf(reference, a + 0.1 * (b - a)), r1 = SectionOf(reference, b - 0.1 * (b - a));
+                if (r0 != r1) continue;
+                double refBpm = reference[r0].Bpm, bpm = detected[i].Bpm;
+                var features = TimingAnalyzer.Core.OctaveFeatures.Measure(envelope, bpm, a, b, ratios);
+                int label = Array.FindIndex(ratios, r => Math.Abs(bpm * r / refBpm - 1) < 0.01);
+                rows.Add(string.Create(inv, $"{song.Set},{Path.GetFileName(Path.GetDirectoryName(song.Audio))?.Replace(',', ' ')},{a:0},{b:0},{bpm:0.###},{refBpm:0.###},{(label < 0 ? "" : ratios[label].ToString("0.####", inv))},{string.Join(",", features.Select(f => f.ToString("0.####", inv)))}"));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or FormatException or ArgumentException or InvalidOperationException) { }
+        int n = Interlocked.Increment(ref done);
+        if (n % 50 == 0) Console.Error.WriteLine($"{n}/{songs.Count} songs");
+    });
+    using (var csv = new StreamWriter(args[2]))
+    {
+        csv.WriteLine("set,song,start,end,bpm,ref_bpm,label," + string.Join(",", TimingAnalyzer.Core.OctaveFeatures.Names(ratios)));
+        foreach (var row in rows.Order(StringComparer.Ordinal)) csv.WriteLine(row);
+    }
+    Console.WriteLine($"{rows.Count} sections from {songs.Count} songs -> {args[2]}");
+    return 0;
+}
+if (args.Length >= 2 && args[0] == "triplet")
+{
+    // timing-eval triplet <songs.tsv>: for each one-tempo Auto-time answer of at least 150 BPM, the triplet measure of
+    // MultiBpmOptions.TripletRatio (other-beat peak / strongest-beat peak, folded at three beats) next to the map's
+    // main BPM (the red line covering the most time) over the detected one: ratio ~0.333 means the map is at a third.
+    var songs = SongSelection.Read(args[1]);
+    var lines = new ConcurrentBag<(double Measure, string Text)>();
+    var plain = multiOptions with { TripletRatio = 0 };
+    Parallel.ForEach(songs, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) }, song =>
+    {
+        try
+        {
+            var reference = BeatGrid.Sort(OsuFile.Load(song.Reference).RedLines);
+            var (envelope, duration) = EnvelopeCache.Get(song.Audio, cache);
+            var detected = TimingAnalyzer.Core.MultiBpmAnalyzer.Analyze(envelope, plain);
+            if (detected.Count != 1 || detected[0].Bpm < 150 || reference.Length == 0) return;
+            var main = reference.Select((p, i) => (p.Bpm, Span: (i + 1 < reference.Length ? reference[i + 1].Time : duration) - p.Time)).MaxBy(x => x.Span);
+            var (beat, measure) = TimingAnalyzer.Core.MultiBpmAnalyzer.TripletPeaks(envelope, detected[0], duration);
+            lines.Add((measure, string.Create(inv, $"{measure:0.000}  beat {beat}  {detected[0].Bpm,8:0.###} BPM  map {main.Bpm,8:0.###} (x{main.Bpm / detected[0].Bpm:0.###})  {song.Set,-3} {Path.GetFileName(Path.GetDirectoryName(song.Audio))}")));
+        }
+        catch (Exception ex) when (ex is IOException or FormatException or ArgumentException or InvalidOperationException) { }
+    });
+    foreach (var l in lines.OrderBy(l => l.Measure)) Console.WriteLine(l.Text);
+    Console.WriteLine($"{lines.Count} one-tempo answers of at least 150 BPM in {songs.Count} songs");
+    return 0;
+}
+if (args.Length >= 2 && args[0] == "octave-hint")
+{
+    // timing-eval octave-hint <songs.tsv> [omargin=..]: the octave selector run on the maps' OWN red lines (sections of
+    // >= 10 s). The maps are mappers' timing, so every hint is a false alarm: the cost of showing the selector as a
+    // hint in Check sections. Then on whole-song Auto-time's red lines, the share of hints that point at the map's
+    // BPM (a useful hint) versus away from it.
+    double margin = Opt("omargin", TimingAnalyzer.Core.OctaveSelector.Margin);
+    var songs = SongSelection.Read(args[1]);
+    int refSections = 0, refHints = 0, autoSections = 0, autoHints = 0, useful = 0, harmful = 0;
+    var hintLines = new ConcurrentBag<string>();
+    object gate = new();
+    Parallel.ForEach(songs, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) }, song =>
+    {
+        var reference = BeatGrid.Sort(OsuFile.Load(song.Reference).RedLines);
+        var (envelope, duration) = EnvelopeCache.Get(song.Audio, cache);
+        if (duration > 600000) return;
+        int rs = 0, rh = 0, as_ = 0, ah = 0, u = 0, h = 0;
+        for (int i = 0; i < reference.Length; i++)
+        {
+            double a = reference[i].Time, b = i + 1 < reference.Length ? reference[i + 1].Time : duration;
+            if (b - a < TimingAnalyzer.Core.OctaveSelector.MinSectionMs) continue;
+            rs++;
+            double r = TimingAnalyzer.Core.OctaveSelector.Ratio(envelope, reference[i].Bpm, a, b, margin);
+            if (r != 1) { rh++; hintLines.Add($"{song.Set} {Path.GetFileName(Path.GetDirectoryName(song.Audio))} {a:0}@{reference[i].Bpm:0.##} x{r:0.###}"); }
+        }
+        var detected = TimingAnalyzer.Core.MultiBpmAnalyzer.Analyze(envelope, multiOptions);
+        for (int i = 0; i < detected.Count; i++)
+        {
+            double a = detected[i].TimeMs, b = i + 1 < detected.Count ? detected[i + 1].TimeMs : duration;
+            if (b - a < TimingAnalyzer.Core.OctaveSelector.MinSectionMs) continue;
+            int r0 = SectionOf(reference, a + 0.1 * (b - a)), r1 = SectionOf(reference, b - 0.1 * (b - a));
+            if (r0 != r1) continue;
+            as_++;
+            double r = TimingAnalyzer.Core.OctaveSelector.Ratio(envelope, detected[i].Bpm, a, b, margin);
+            if (r == 1) continue;
+            ah++;
+            if (Math.Abs(detected[i].Bpm * r / reference[r0].Bpm - 1) < 0.01) u++; else h++;
+        }
+        lock (gate) { refSections += rs; refHints += rh; autoSections += as_; autoHints += ah; useful += u; harmful += h; }
+    });
+    foreach (var l in hintLines.Order(StringComparer.Ordinal).Take(30)) Console.WriteLine("  " + l);
+    Console.WriteLine($"margin {margin}: on the maps' own red lines {refHints} hints in {refSections} sections ({refHints / (double)Math.Max(1, refSections):P1} false alarms); " +
+        $"on Auto-time's red lines {autoHints} hints in {autoSections} sections: {useful} point at the map's BPM, {harmful} away from it");
+    return 0;
+}
+if (args.Length >= 2 && args[0] == "check")
+{
+    // timing-eval check <songs.tsv> [set=..] [split=..]: SectionCheck on each reference map's own red lines. The
+    // references are mappers' timing, so every mark is a false alarm or a reference error: the rate of marks per
+    // judged section is the cost of the editor's "check" list.
+    string? set = args.Skip(2).FirstOrDefault(a => a.StartsWith("set=", StringComparison.Ordinal))?[4..];
+    string? split = args.Skip(2).FirstOrDefault(a => a.StartsWith("split=", StringComparison.Ordinal))?[6..];
+    var songs = SongSelection.Read(args[1]).Where(s => (set is null || s.Set == set) && (split is null || s.Split == split)).ToList();
+    var found = new ConcurrentBag<(EvalSong Song, int Judged, int Weak, int Ratio, int Shift, string Marks)>();
+    Parallel.ForEach(songs, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) }, song =>
+    {
+        var reference = BeatGrid.Sort(OsuFile.Load(song.Reference).RedLines);
+        var (envelope, duration) = EnvelopeCache.Get(song.Audio, cache);
+        var sections = reference.Select(p => new TimingAnalyzer.Core.TimingSection(p.Time, p.Bpm)).ToList();
+        var reports = TimingAnalyzer.Core.SectionCheck.Check(envelope, sections, duration);
+        var marks = new List<string>();
+        for (int i = 0; i < reports.Count; i++)
+            if (reports[i] is { } r && (r.Weak || r.BestRatio is not null || r.ShiftMs is not null))
+                marks.Add($"{sections[i].TimeMs:0}@{sections[i].Bpm:0.##}" + (r.Weak ? " weak" : "") +
+                    (r.BestRatio is { } x ? $" x{x:0.###}" : "") + (r.ShiftMs is { } m ? $" {m:+0;-0}ms" : ""));
+        found.Add((song, reports.Count(r => r is not null), reports.Count(r => r?.Weak == true),
+            reports.Count(r => r?.BestRatio is not null), reports.Count(r => r?.ShiftMs is not null), string.Join(", ", marks)));
+    });
+    foreach (var r in found.OrderBy(r => r.Song.Set).ThenBy(r => r.Song.Name, StringComparer.Ordinal).Where(r => r.Marks.Length > 0))
+        Console.WriteLine($"{r.Song.Set} {(r.Song.Name.Length > 44 ? r.Song.Name[..44] : r.Song.Name),-44} {r.Marks}");
+    foreach (var g in found.GroupBy(r => (r.Song.Set, r.Song.Split)).OrderBy(g => g.Key.Set).ThenBy(g => g.Key.Split))
+        Console.WriteLine($"  {g.Key.Set} {g.Key.Split,-5} songs {g.Count(),3}  judged sections {g.Sum(r => r.Judged),4}  weak {g.Sum(r => r.Weak),3}  " +
+            $"ratio {g.Sum(r => r.Ratio),3}  shift {g.Sum(r => r.Shift),3}  songs with a mark {g.Count(r => r.Marks.Length > 0),3}");
+    return 0;
+}
+if (args.Length >= 2 && args[0] == "range-section")
+{
+    // timing-eval range-section <songs.tsv> [set=..] [split=..] [min=ms] [trim=ms]: a range over one reference section
+    // (its red line + trim to the next − trim, sections of at least min ms), as a user highlights a stretch with one
+    // tempo. Aligned 10 ms recall of the reference beats in the range for: whole-song red lines, the multi-BPM
+    // analyzer on the slice, and the single-BPM detector on the slice (Auto-time section).
+    string? set = args.Skip(2).FirstOrDefault(a => a.StartsWith("set=", StringComparison.Ordinal))?[4..];
+    string? split = args.Skip(2).FirstOrDefault(a => a.StartsWith("split=", StringComparison.Ordinal))?[6..];
+    double min = Opt("min", 10000), trim = Opt("trim", 500);
+    var songs = SongSelection.Read(args[1]).Where(s => (set is null || s.Set == set) && (split is null || s.Split == split)).ToList();
+    var found = new ConcurrentBag<(EvalSong Song, double Start, int Beats, int Whole, int Multi, int Single)>();
+    Parallel.ForEach(songs, new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2) }, song =>
+    {
+        var reference = BeatGrid.Sort(OsuFile.Load(song.Reference).RedLines);
+        if (reference.Length < 2) return;
+        var (envelope, duration) = EnvelopeCache.Get(song.Audio, cache);
+        if (duration > 600000) return;
+        var whole = new MultiAlgorithm(multiOptions).Run(envelope, duration);
+        if (whole.Count == 0) return;
+        double shift = GridAgreement.Score(reference, whole, duration).ShiftMs;
+        // ranchor=1: the whole song's detector BPM as the range's octave anchor (MultiBpmOptions.AnchorBpm); rpad=ms: context
+        // analyzed on each side of the range (RangeTiming.Analyze contextMs).
+        var rangeOptions = Opt("ranchor", 0) != 0 ? multiOptions with { AnchorBpm = TimingAnalyzer.Core.RangeTiming.WholeSongAnchor(envelope) } : multiOptions;
+        for (int i = 0; i < reference.Length; i++)
+        {
+            double a = reference[i].Time + trim, b = (i + 1 < reference.Length ? reference[i + 1].Time : duration) - trim;
+            if (b - a < min || a < 0) continue;
+            var multi = TimingAnalyzer.Core.RangeTiming.Analyze(envelope, a, b, rangeOptions, Opt("rpad", 0))
+                .Select(s => new TimingPoint(OsuPrecision.Time(s.TimeMs), 60000 / OsuPrecision.Bpm(s.Bpm))).GroupBy(p => p.Time).Select(g => g.First()).ToArray();
+            var r = TimingAnalyzer.Core.Analyzer.AnalyzeEnvelope(envelope[(int)a..(int)b]);
+            TimingPoint[] single = r.Bpm is { } bpm && r.Offset is { } offset ? [new TimingPoint(OsuPrecision.Time(offset + (int)a), 60000 / OsuPrecision.Bpm(bpm))] : [];
+            var beats = GridAgreement.Beats(reference, reference[0].Time, duration).Where(t => t >= a && t < b).ToArray();
+            int Hits(IReadOnlyList<TimingPoint> predicted)
+            {
+                if (predicted.Count == 0) return 0;
+                var aligned = predicted.Select(p => p with { Time = p.Time - shift }).ToArray();
+                return beats.Count(t => GridAgreement.Nearest(aligned, t, 1) <= 10);
+            }
+            found.Add((song, a, beats.Length, Hits(whole), Hits(multi), Hits(single)));
+        }
+    });
+    Console.WriteLine($"one reference section per range (>= {min:0} ms, trimmed {trim:0} ms): aligned 10 ms recall in the range");
+    foreach (var g in found.GroupBy(r => (r.Song.Set, r.Song.Split)).OrderBy(g => g.Key.Set).ThenBy(g => g.Key.Split))
+    {
+        double Rate(Func<(EvalSong Song, double Start, int Beats, int Whole, int Multi, int Single), int> hits) => g.Sum(hits) / (double)g.Sum(r => r.Beats);
+        // Sections where whole-song timing is poor (< 50 %): the ones a user would re-analyze.
+        var poor = g.Where(r => r.Whole < 0.5 * r.Beats).ToArray();
+        double PoorRate(Func<(EvalSong Song, double Start, int Beats, int Whole, int Multi, int Single), int> hits) =>
+            poor.Length == 0 ? double.NaN : poor.Sum(hits) / (double)poor.Sum(r => r.Beats);
+        Console.WriteLine($"  {g.Key.Set} {g.Key.Split,-5} ranges {g.Count(),3}  whole {Rate(r => r.Whole):0.000}  multi {Rate(r => r.Multi):0.000}  " +
+            $"single {Rate(r => r.Single):0.000}  | whole < 50 %: {poor.Length,3} ranges, whole {PoorRate(r => r.Whole):0.000}  multi {PoorRate(r => r.Multi):0.000}  " +
+            $"single {PoorRate(r => r.Single):0.000}  multi fixes {poor.Count(r => r.Multi >= 0.8 * r.Beats),3}  single fixes {poor.Count(r => r.Single >= 0.8 * r.Beats),3}");
+    }
+    return 0;
+}
+if (args.Length >= 2 && args[0] is "edge-lag" or "phase" or "bar-start" or "octave-beat" or "normal-variants" or "auto-time")
+{
+    // The measurements behind docs/PHASE1-STATUS.md E43-E44 (AutoTimeChecks.cs): timing-eval <check> <songs.tsv>...
+    var lists = args.Skip(1).ToList();
+    return args[0] switch
+    {
+        "edge-lag" => AutoTimeChecks.EdgeLag(lists, cache),
+        "phase" => AutoTimeChecks.Phase(lists, cache),
+        "bar-start" => AutoTimeChecks.BarStartCheck(lists, cache),
+        "octave-beat" => AutoTimeChecks.OctaveBeat(lists, cache),
+        "auto-time" => AutoTimeChecks.AutoTime(lists),
+        _ => AutoTimeChecks.NormalVariants(lists),
+    };
+}
 if (args.Length >= 2 && args[0] == "run")
 {
     var algorithm = algorithms[args.Length > 2 ? args[2] : "baseline"]();
@@ -383,7 +769,6 @@ if (args.Length >= 2 && args[0] == "run")
         {
             var reference = BeatGrid.Sort(OsuFile.Load(song.Reference).RedLines);
             var (envelope, duration) = EnvelopeCache.Get(song.Audio, cache);
-            if (duration > 600000) { rows.Add((song, null, reference.Length, 0, "longer than 10 minutes")); return; }
             var predicted = RunAlgorithm(algorithm, song, envelope, duration);
             if (predicted.Count == 0) { rows.Add((song, null, reference.Length, 0, "no timing")); return; }
             var score = GridAgreement.Score(reference, predicted, duration);

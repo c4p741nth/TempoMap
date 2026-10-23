@@ -6,13 +6,17 @@ namespace TimingAnalyzer.Editor.Tests;
 
 public class ShiftTests
 {
-    private static byte[] Fixture() => File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "my-dearest-tv.osu"));
+    private static byte[] Fixture() => File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "steady-multi.osu"));
 
     [Theory]
     [InlineData(-1)]
     [InlineData(-0.5)]
     [InlineData(-0.25)]
     [InlineData(-0.125)]
+    [InlineData(-0.0625)]
+    [InlineData(-0.03125)]
+    [InlineData(0.03125)]
+    [InlineData(0.0625)]
     [InlineData(0.125)]
     [InlineData(0.25)]
     [InlineData(0.5)]
@@ -106,6 +110,10 @@ public class ShiftTests
         Assert.Throws<InvalidOperationException>(() => edits.ShiftRedLines(RedLineScope.Selected, 1));
         Assert.Throws<InvalidOperationException>(() => edits.ShiftRedLinesMs(RedLineScope.Selected, 1, 99));
         Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines(RedLineScope.All, 0.3));
+        Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines(RedLineScope.All, 1.0 / 64));
+        Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines(RedLineScope.All, 2));
+        Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines(RedLineScope.All, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines(RedLineScope.All, double.NaN));
         Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLinesMs(RedLineScope.All, double.NaN));
         Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines((RedLineScope)99, 1));
         Assert.False(edits.History.CanUndo);
@@ -136,7 +144,7 @@ public class ShiftTests
             Assert.Equal(2150, vm.SelectedRow!.Point.Time);
             Assert.Equal(1, vm.SelectedRow.Index);
             Assert.Equal(vm.Edits.RedLines, engine.Timing);
-            Assert.Contains("0.25 beats", vm.Status, StringComparison.Ordinal);
+            Assert.Contains("by +1/4 beat.", vm.Status, StringComparison.Ordinal);
             var before = vm.Edits.RedLines.ToArray();
             vm.ShiftBeatsCommand.Execute("0.25");
             Assert.Contains("neighbouring", vm.Status, StringComparison.Ordinal);
@@ -153,5 +161,39 @@ public class ShiftTests
             Assert.Equal(new double[] { -5, 1995, 2195 }, engine.Timing.Select(point => point.Time));
         }
         finally { CultureInfo.CurrentCulture = previous; File.Delete(path); }
+    }
+    [Fact]
+    public async Task StepButtonsShiftBySizeChosenInTheirBoxes()
+    {
+        using var vm = new EditorViewModel(_ => Task.FromResult(AudioContent.Create(new double[100], 1000)), _ => new ViewModelTests.FakePlayback());
+        await vm.LoadAsync(Path.GetTempFileName());
+        vm.Edits.Replace([new(0, 500), new(4000, 480), new(9000, 400)]);
+        vm.SelectRows([1], 1);
+        Assert.Equal(["1/1", "1/2", "1/4", "1/8", "1/16", "1/32"], vm.ShiftBeatSteps.Select(o => o.ToString()));
+        Assert.Equal((4, 1), (vm.SelectedShiftBeatStep.Divisor, vm.SelectedShiftMsStep));
+        vm.SelectedShiftBeatStep = vm.ShiftBeatSteps.First(o => o.Divisor == 32);
+        vm.ShiftBeatStepCommand.Execute("1");
+        Assert.Equal(4015, vm.Edits.RedLines[1].Time); // 480 / 32 = 15 ms of its own beat.
+        Assert.Contains("by +1/32 beat.", vm.Status, StringComparison.Ordinal);
+        vm.SelectedShiftBeatStep = vm.ShiftBeatSteps.First(o => o.Divisor == 16);
+        vm.ShiftBeatStepCommand.Execute("-1");
+        Assert.Equal(3985, vm.Edits.RedLines[1].Time);
+        Assert.Contains("by -1/16 beat.", vm.Status, StringComparison.Ordinal);
+        vm.SelectedShiftBeatStep = vm.ShiftBeatSteps[0];
+        vm.ShiftBeatStepCommand.Execute("1");
+        Assert.Equal(4465, vm.Edits.RedLines[1].Time);
+        Assert.Contains("by +1 beat.", vm.Status, StringComparison.Ordinal);
+        vm.SelectedShiftMsStep = 20;
+        vm.ShiftMsStepCommand.Execute("-1");
+        Assert.Equal(4445, vm.Edits.RedLines[1].Time);
+        Assert.Contains("by -20 ms.", vm.Status, StringComparison.Ordinal);
+        vm.ShiftMsStepCommand.Execute("1");
+        Assert.Equal(4465, vm.Edits.RedLines[1].Time);
+        Assert.Equal([0.0, 9000], new[] { vm.Edits.RedLines[0].Time, vm.Edits.RedLines[2].Time }); // Unselected lines stay.
+        // Choices outside the boxes are ignored.
+        vm.SelectedShiftMsStep = 7; vm.SelectedShiftBeatStep = new SnapOption(3); vm.SelectedShiftBeatStep = null!;
+        Assert.Equal((1, 20), (vm.SelectedShiftBeatStep.Divisor, vm.SelectedShiftMsStep));
+        for (int i = 0; i < 5; i++) vm.Undo();
+        Assert.Equal(4000, vm.Edits.RedLines[1].Time); // One undo step per press.
     }
 }

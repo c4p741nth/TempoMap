@@ -7,13 +7,24 @@ public sealed class UndoStack
     private readonly Stack<(TimingPoint[] Before, TimingPoint[] After)> undo = new(), redo = new();
     public bool CanUndo => undo.Count > 0;
     public bool CanRedo => redo.Count > 0;
+    /// <summary>Changes whenever a step is recorded, undone or redone (not when one is extended), so a caller can tell that
+    /// nothing else was edited since the step it extends.</summary>
+    public int Version { get; private set; }
     public void Record(TimingPoint[] before, TimingPoint[] after)
     {
         undo.Push((before.ToArray(), after.ToArray()));
         redo.Clear();
+        Version++;
     }
-    public TimingPoint[] Undo() { var edit = undo.Pop(); redo.Push(edit); return edit.Before.ToArray(); }
-    public TimingPoint[] Redo() { var edit = redo.Pop(); undo.Push(edit); return edit.After.ToArray(); }
+    /// <summary>Makes the last recorded step end at <paramref name="after"/> instead: one undo reverts a run of small edits.</summary>
+    public void ExtendLast(TimingPoint[] after)
+    {
+        var last = undo.Pop();
+        undo.Push((last.Before, after.ToArray()));
+        redo.Clear();
+    }
+    public TimingPoint[] Undo() { var edit = undo.Pop(); redo.Push(edit); Version++; return edit.Before.ToArray(); }
+    public TimingPoint[] Redo() { var edit = redo.Pop(); undo.Push(edit); Version++; return edit.After.ToArray(); }
 }
 
 public sealed class TimingEdits
@@ -29,6 +40,18 @@ public sealed class TimingEdits
         var after = BeatGrid.Sort(redLines);
         if (points.SequenceEqual(after)) return;
         History.Record(points, after);
+        points = after;
+        Changed?.Invoke();
+    }
+    /// <summary>
+    /// <see cref="Replace"/>, except that when <paramref name="continuing"/> is true (the last undo step is the one this
+    /// call carries on) that step is extended, so a held BPM nudge is one undo step, not hundreds.
+    /// </summary>
+    public void ReplaceMerging(IEnumerable<TimingPoint> redLines, bool continuing)
+    {
+        var after = BeatGrid.Sort(redLines);
+        if (points.SequenceEqual(after)) return;
+        if (continuing && History.CanUndo) History.ExtendLast(after); else History.Record(points, after);
         points = after;
         Changed?.Invoke();
     }
@@ -64,12 +87,14 @@ public sealed class TimingEdits
         var remove = indices.ToHashSet();
         Replace(points.Where((_, i) => !remove.Contains(i)));
     }
+    /// <summary>Beat shifts are 1/n of each line's own beat for these n (powers of two, so the fractions are exact).</summary>
+    public static IReadOnlyList<int> ShiftDivisors { get; } = [1, 2, 4, 8, 16, 32];
     public void ShiftRedLines(RedLineScope scope, double beats, int selectedIndex = -1) =>
         ShiftRedLines(scope, beats, selectedIndex < 0 ? [] : [selectedIndex]);
     public void ShiftRedLines(RedLineScope scope, double beats, IReadOnlyCollection<int> selected)
     {
-        if (beats is not (-1 or -0.5 or -0.25 or -0.125 or 0.125 or 0.25 or 0.5 or 1))
-            throw new ArgumentOutOfRangeException(nameof(beats), "Choose an eighth, quarter, half or whole beat shift.");
+        if (!ShiftDivisors.Any(divisor => divisor == 1 / Math.Abs(beats)))
+            throw new ArgumentOutOfRangeException(nameof(beats), "Choose a 1, 1/2, 1/4, 1/8, 1/16 or 1/32 beat shift.");
         Shift(scope, point => beats * point.BeatLength, selected);
     }
     public void ShiftRedLinesMs(RedLineScope scope, double ms, int selectedIndex = -1) =>

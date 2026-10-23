@@ -95,21 +95,46 @@ public class FollowPlayheadTests
         var vm = session.Model;
         Assert.True(vm.FollowPlayhead);
         vm.Seek(6000); vm.TogglePlay();
-        int reads = session.Engine.Reads;
         Assert.Equal(6000 - vm.SpanMs / 3, vm.StartMs, 8);
         vm.ManualStartMs = vm.StartMs;
-        session.Now = 16; vm.UpdateFrame();
-        Assert.Equal(reads, session.Engine.Reads);
-        Assert.Equal(6016, vm.PositionMs, 8);
-        Assert.Equal(6016 - vm.SpanMs / 3, vm.StartMs, 8);
-        session.Engine.Position = 6050; session.Now = 50; vm.UpdateFrame();
+        // The sound starts a moment after Play (BASS: ~70 ms); until the engine moves, every frame reads it.
+        int reads = session.Engine.Reads;
+        session.Now = 6; vm.UpdateFrame();
         Assert.Equal(reads + 1, session.Engine.Reads);
-        session.Now = 66; vm.UpdateFrame();
-        Assert.Equal(6066, vm.PositionMs, 8);
-        Assert.Equal(6066 - vm.SpanMs / 3, vm.StartMs, 8);
+        Assert.Equal(6000, vm.PositionMs);
+        session.Engine.Position = 6000.5; session.Now = 10; vm.UpdateFrame();
+        reads = session.Engine.Reads;
+        session.Now = 26; vm.UpdateFrame();
+        Assert.Equal(reads, session.Engine.Reads);
+        Assert.Equal(6016.5, vm.PositionMs, 8);
+        Assert.Equal(6016.5 - vm.SpanMs / 3, vm.StartMs, 8);
+        session.Engine.Position = 6050.5; session.Now = 60; vm.UpdateFrame();
+        Assert.Equal(reads + 1, session.Engine.Reads);
+        session.Now = 76; vm.UpdateFrame();
+        Assert.Equal(6066.5, vm.PositionMs, 8);
+        Assert.Equal(6066.5 - vm.SpanMs / 3, vm.StartMs, 8);
         vm.SelectedSpeed = "0.75";
-        session.Now = 82; vm.UpdateFrame();
-        Assert.InRange(vm.PositionMs, 6070, 6078);
+        session.Now = 92; vm.UpdateFrame();
+        Assert.InRange(vm.PositionMs, 6070.5, 6078.5);
+    }
+
+    [Fact]
+    public void AfterASeekWhilePlayingTheHeadWaitsForTheSound()
+    {
+        var clock = new PlayheadClock();
+        clock.Synchronize(1000, 0, 1, true);
+        clock.Synchronize(5000, 10, 1, true, snap: true); // A seek while playing: the output restarts silent.
+        Assert.True(clock.WaitingForStart);
+        Assert.Equal(5000, clock.PositionAt(40)); // Held, not running ahead of the sound.
+        clock.Synchronize(5000, 50, 1, true); // The engine still reports the seek.
+        Assert.Equal(5000, clock.PositionAt(70));
+        clock.Synchronize(5003, 73, 1, true); // The sound moved: run from where the engine is, at full speed.
+        Assert.False(clock.WaitingForStart);
+        Assert.Equal(5003, clock.PositionAt(73));
+        Assert.Equal(5019, clock.PositionAt(89), 8);
+        clock.Synchronize(6000, 100, 1, false, snap: true); // A seek while paused never waits.
+        Assert.False(clock.WaitingForStart);
+        Assert.Equal(6000, clock.PositionAt(200));
     }
 
     [Fact]
@@ -233,11 +258,12 @@ public class FollowPlayheadTests
         vm.FollowPlayhead = true;
         vm.Seek(29990);
         Assert.Equal(vm.ScrollMaximum, vm.StartMs);
-        session.Now = 16; vm.UpdateFrame();
+        session.Engine.Position = 29991; session.Now = 4; vm.UpdateFrame(); // The sound starts after the seek.
+        session.Now = 20; vm.UpdateFrame();
         Assert.Equal(30000, vm.PositionMs);
         Assert.Equal(vm.ScrollMaximum, vm.StartMs);
         session.Engine.Position = 30000; session.Engine.IsPlaying = false;
-        session.Now = 50; vm.UpdateFrame();
+        session.Now = 54; vm.UpdateFrame();
         Assert.Equal(30000, vm.PositionMs);
         vm.TogglePlay();
         Assert.Equal(0, vm.PositionMs);

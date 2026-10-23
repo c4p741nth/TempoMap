@@ -64,7 +64,7 @@ public class ExportTests
         string path = Path.Combine(dir, "copy.osu");
         try
         {
-            byte[] original = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "my-dearest-tv.osu"));
+            byte[] original = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "steady-multi.osu"));
             File.WriteAllBytes(path, original);
             using var vm = new EditorViewModel(_ => throw new InvalidOperationException(), _ => new ViewModelTests.FakePlayback());
             await vm.LoadAsync(path);

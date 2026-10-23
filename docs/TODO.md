@@ -26,11 +26,22 @@ Nothing open. T1-T6 done, parity 45/45 (rechecked 2026-10-18).
   section (duplicate red lines, drift mode on Billie Jean). Only a person at the speakers can do these.
 - [ ] Listen for crackles with the unbuffered output (E18); fallback is a small buffer.
 
+## Auto-time on songs like ReCreate of the Red (2026-10-23, E43-E44 in `PHASE1-STATUS.md`)
+
+- [ ] **Octave of a high one-tempo answer the model cannot settle.** recreate.ogg: the detector says 286.0, the user's 143.
+  The beat head's alternate-beat strength is 0.50 there; the only clear cases (0.00-0.09: Rebellious exorcist, Dusk,
+  Ragnarok) are halved by themselves, but Setsuna Trip (290, the map keeps 290) measures 0.37 and VIVIDVELOCITY (256, map
+  at 128) 0.53, so no threshold above 0.2 passes "equal or better on every set". The status line hints (below 0.6 from 240
+  BPM) and ÷2 then Fit offset, or typing 143 in the BPM box, gives the user's lines.
+- [ ] **A short tempo section** (the 18 beats of 180 BPM at 49 108-55 108 ms, quiet, between two 143 BPM parts) is not
+  found by Normal; Shift+drag over it and Auto-time range gives 180 @ 49 092 (49 108 with the edge lag).
+- [ ] Phase check by ear of the beat-head phase on the 38 evaluation songs it made worse (M1LLI0N PP 0.951 → 0.579,
+  IRIS 0.752 → 0.592): the sets improved (every set equal or better), single songs did not all.
+
 ## Phase 2 multi-BPM (`PHASE2-STATUS.md`)
 
-- [ ] M2 gate "MAMBO boundaries" is recorded as a structural FAIL of Phase 2. Phase 3's ramp bridge covers it,
-  but the M reference was re-saved from our own output on 2026-10-17, so MAMBO is no longer an independent check.
-  Restore the original test map from git history if it should be a gate again.
+- [x] M2 gate "MAMBO boundaries": the M reference was re-saved in osu! from our own output on 2026-10-17, so the
+  original timing is gone; set M was removed from `tests/multibpm-songs.tsv` on 2026-10-18 (user's decision).
 
 ## Phase 3 complex multi-BPM (`PHASE3-PLAN.md`, `PHASE3-STATUS.md`)
 
@@ -56,3 +67,13 @@ the opt-in drift 1 beat), 2-beat ramp steps,
 free (non-monotone) ramps, Beat This! ML tracker, independent per-N-beat fits (`grouped4`), whole-BPM snap above
 10 ms, neighbour guard on the half-tempo rule, dotted-beat (×1.5) pass, ramp-run merge guard, live-drum wobble check for
 an automatic drift 1 beat. Numbers for each are in `PHASE3-STATUS.md`.
+
+Auto-time range over a tempo ramp (2026-10-21, E41 in `PHASE1-STATUS.md`, Moonlit Occultation 206 → 240): the whole
+song's BPM as the range's octave anchor, 10 s of context each side, both, and context only when the range has no
+exact BPM all lower some evaluation set (5-9 of 16 below); kept off as `MultiBpmOptions.AnchorBpm` and
+`RangeTiming.Analyze(contextMs)`. Whole-song Normal times that ramp within 5 ms on its clear beats. Still open there:
+the beat model halves the beat inside the ramp (in-between beats at 0.30-0.49 probability).
+
+Re-analyzing every whole-song section of 20 s or more on its own slice after Auto-time (2026-10-18, E33 follow-up):
+held-out aligned F10 unchanged on A, B, C, D and E hold (± 0.002); on Ill it turns 189.3 into 142 but keeps the false
+ramp after it, because the whole-song section boundaries are already wrong there. Auto-time range by hand covers it.

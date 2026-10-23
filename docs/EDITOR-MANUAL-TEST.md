@@ -27,8 +27,8 @@ proposal mapping and file writes; they do not establish audible synchronization 
 - [ ] Open audio directly (MP3, OGG or WAV). The waveform and a default 120 BPM red line appear.
 - [ ] Open a `.osu` in the copied folder. Its AudioFilename resolves relative to the map, the waveform
   loads, and the side panel contains its red lines. Try a map with several BPM sections.
-- [ ] For fixture smoke checks, use copies of `my-dearest-tv.osu`, `m1ll10n-pp.osu` and `architecture.osu`
-  from `tests/TimingAnalyzer.Editor.Tests/Fixtures`. Supply the corresponding audio beside each copy.
+- [ ] For fixture smoke checks, use copies of any of your own beatmaps with their audio beside them (the repository's
+  fixtures in `tests/TimingAnalyzer.Editor.Tests/Fixtures` are synthetic and have no audio).
   Without that audio, timing should still load and the status should explain the missing file.
 - [ ] Confirm the red section markers, purple measures, gray beats, dim quarter beats, orange selected
   red line and yellow playhead. A new red line resets measure counting.
@@ -104,7 +104,7 @@ proposal mapping and file writes; they do not establish audible synchronization 
   line and shift by ¼ beat: the list shows whole ms and at most three BPM decimals.
 - [ ] Ctrl+P adds a red line at the playhead (like Insert).
 - [ ] Drag across several red lines on empty waveform space: an orange band appears, and on release they
-  turn orange and get ● in the list. Shift+drag adds more; Ctrl+A selects all; Esc clears. A short click
+  turn orange and get ● in the list. Ctrl+A selects all; Esc clears. (Since E33 Shift+drag highlights a range.) A short click
   still seeks, and grabbing a red line still drags it.
 - [ ] With three lines selected, press +¼ beat: all three move by their own
   beat, as one Ctrl+Z step. Push them into an unselected line: a status message, no edit. Delete removes
@@ -152,15 +152,72 @@ proposal mapping and file writes; they do not establish audible synchronization 
   waveform stays usable; after an auto-time the Apply buttons are in view without scrolling; Apply...
   asks a one-line yes/no.
 
+## E42/E43: held arrows, ❮ BPM ❯, Esc, Auto-time on the edge and on a bar line
+
+- [ ] Hold → for a second or two: the yellow line steps once, and after 0.3 s runs on smoothly, faster the longer you
+  hold; release stops it where it is (it does not creep on). ← does the same. While playing, the sound pauses during
+  the run and plays on from the head on release. Shift+→ held grows the blue range with it.
+- [ ] Shift row, **❮ 0.01 ❯ BPM**: with a red line selected, press ❯ (or Ctrl+↑): its BPM goes 143 → 143.01 and its
+  time stays. Hold ❯ and it keeps going; one Ctrl+Z undoes the whole run. The drop-down picks 0.001 / 0.01 / 0.1 / 1
+  and is remembered; Ctrl+Shift+↑/↓ takes ten steps. Tune a BPM against the waveform at the far end of a long section.
+- [ ] Press Esc in the Keys window (F1), About, and the Replace red lines? window: each closes (Esc in the last one is
+  Cancel). Esc in the main window still clears the selection.
+- [ ] Auto-time on a sharp-drummed song (recreate.ogg, or any electronic or metal song): the proposed offset sits on the
+  start of the drum hit in the waveform, not 15-20 ms before it; Settings → Auto-time on the waveform's edge off gives
+  the old offset (the status says how many ms the lines sit after the onset peak).
+- [ ] Settings → Auto-time starts on a bar line: Auto-time on a song with an intro puts the first red line on the
+  first beat of a bar that has music (the purple bar lines then fall on the downbeats); the status says how many beats it
+  moved. Off: the detector's first beat after 35 ms.
+- [ ] recreate.ogg (E44): Auto-time proposes 285.993 BPM and the status says the map may be at half of it. Type 143 in the
+  BPM box and Auto-time (or ÷2 then Fit offset): one red line near 140 ms on the 143 grid of the long part. Paste
+  `437,419.5804195804196,4,1,0,100,1,0`, `49108,333.3333333333333,4,1,0,100,1,0` and
+  `55108,419.5804195804196,4,1,0,100,1,0` (Replace all), move each line 90 ms with the Shift row, select it and press
+  Fit offset: it comes back to within 4 ms (437, 49104, 55108). Listen to the metronome on the first hit at 437.
+
+## E37: drop to open, ❮ step ❯ shifts, move timing point here
+
+- [ ] Drag a `.osu` from Explorer onto the window: it opens with its audio, as File → Open does. Drag an audio file:
+  it opens on its own. Drag a `.txt`: the cursor shows no drop, and dropping it only says what can be dropped.
+- [ ] The Shift row reads **Shift ❮ 1/4 ❯ beat ❮ 1 ❯ ms**. With one red line selected pick 1/32 and press ❯: the line
+  moves a thirty-second of its own beat (15 ms at 125 BPM); 1/16 twice that. Pick 5 ms: ❮ moves 5 ms earlier. Each
+  press is one Ctrl+Z. Ctrl+←/→ still shift 1 ms. Close and reopen: both drop-downs keep their choice.
+- [ ] Select a red line, put the playhead (yellow) where it belongs (click, or ←/→), press **⇥** beside +: the red
+  line jumps onto the yellow line, its BPM and meter kept. Ctrl+Shift+P does the same; Ctrl+P (+) still adds a new
+  line. With several lines selected they move together. Past the next red line it is refused.
+
+## E35: Check sections, tempo ratios, Fill ramp
+
+- [ ] Open Parallel Universe Shifter with its map, **Check sections** (Ctrl+K): one violet band at 04:43:730 (250 BPM),
+  selected in the table. Listen with the metronome: is the map's grid or the one 59 ms later on the drums?
+- [ ] Select a section, press ÷2 then ×2: the BPM halves and comes back, the red line stays where it was; Ctrl+Z
+  undoes each.
+- [ ] Delete a ramp's inner red lines, select its first line and the line after it (Ctrl+click), **Fill ramp**
+  (Ctrl+L): a red line per beat, the BPM climbing evenly; listen to the clicks over the music. Where the music holds a
+  tempo midway, select that line too and fill again.
+- [ ] Edit any red line after a check: the violet bands go away.
+
+## E33: Auto-time range, paste, + / − / ✓
+
+- [ ] Shift+drag across the waveform (start on a red line too): a blue band appears and stays; the red line does not
+  move. Shift+→ / Shift+← step the playhead by the beat snap and grow / shrink a band from where they started. Esc
+  clears it.
+- [ ] a crowd of rebellion - Ill: Auto-time, Apply; highlight about 131-169 s, **Auto-time range**
+  (Ctrl+R): one 142 BPM red line at about 131 678, and the 220 BPM part after 169 s keeps its timing. Listen to the
+  metronome over the drums there, and check the start against the map's 131 722.
+- [ ] Ctrl+Z after Auto-time range restores the previous red lines in one step.
+- [ ] Copy rows from a .osu or the osu! editor's timing setup, Ctrl+V: the red lines join (same time replaces), green
+  rows are skipped with a message. Ctrl+Shift+V asks, then replaces every red line.
+- [ ] **+** puts a red line at the playhead (yellow line), **−** deletes the selected lines, **✓** applies the fields.
+  The To playhead button and Ctrl+Shift+P are gone (E37 brings the move back as ⇥ beside +).
+
 ## E32: menu bar, toolbars, shortcuts, remembered settings
 
 - [ ] The menu bar has File, Edit, Timing, Settings and Help; Open/Save/Copy/Undo/Redo/About are no longer toolbar
   buttons, and there is no All / Selected shift box.
 - [ ] The three toolbars (playback, Auto-time, Shift) line up: drop-downs, boxes and buttons are the same height as
   their labels' line, with a clear gap between groups. At 900 px wide a group wraps whole onto the next line.
-- [ ] Click a row in the timing table: it is selected, the playhead (yellow) does not move. Put the playhead on a
-  hit with ←/→, press **To playhead** (or Ctrl+Shift+P): the line moves onto the playhead, one Ctrl+Z step.
-  Double-click a row: the playhead jumps there.
+- [ ] Click a row in the timing table: it is selected, the playhead (yellow) does not move. Double-click a row: the
+  playhead jumps there. (To playhead was removed in E33; E37 brings it back as ⇥ beside +.)
 - [ ] Ctrl+←/→ shift the selected lines 1 ms, Ctrl+Shift+←/→ 5 ms; M toggles the metronome, F follow, F1 lists the
   keys; Ctrl+T runs Auto-time and Ctrl+Enter applies; Ctrl+O / Ctrl+Shift+O / Ctrl+S open and save.
 - [ ] After Auto-time no list of "1. xxx ms - xxx BPM" lines appears; the status line summarises the proposal.
@@ -194,7 +251,7 @@ proposal mapping and file writes; they do not establish audible synchronization 
   from the left; while playing, playback continues from the line. (Since E32 a single click only selects.)
 - [ ] Copy timing points and paste into the osu! editor's timing setup: only number rows, no `[TimingPoints]`.
 - [ ] Shift −⅛ / +⅛ beat moves each red line by an eighth of its own beat, one undo step.
-- [ ] Open a .osu: the window title reads "Artist - Title [Difficulty] (Mapper) - Redline by C4P741N";
+- [ ] Open a .osu: the window title reads "Artist - Title [Difficulty] (Mapper) - Tempomap by C4P741N";
   open plain audio: its file name.
 
 ## Phase 1.3: BPM lock, per-section auto-time, follow and volume

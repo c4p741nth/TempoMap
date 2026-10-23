@@ -29,7 +29,7 @@ public static class DriftLines
     {
         var o = options ?? new MultiBpmOptions();
         var original = Analyzer.AnalyzeEnvelope(d);
-        double? anchor = original.Bpm ?? original.ApproximateBpm;
+        double? anchor = original.Bpm ?? MultiBpmAnalyzer.NearAnchor(original.ApproximateBpm, o) ?? o.AnchorBpm;
         return Fit(MultiBpmAnalyzer.TrackBeats(d, o, anchor), beatsPerLine);
     }
 

@@ -10,6 +10,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The editor's analysis (CoreTiming, BeatModel) compiled in, so the checks run the code the editor runs; it needs
+         ONNX Runtime and the model file beside the exe. -->
+    <Compile Include="..\..\src\TimingAnalyzer.App\BeatModel.cs" Link="App\BeatModel.cs" />
+    <Compile Include="..\..\src\TimingAnalyzer.App\CoreTiming.cs" Link="App\CoreTiming.cs" />
+    <None Include="..\..\src\TimingAnalyzer.App\Models\beatnet.onnx" Link="Models\beatnet.onnx" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\TimingAnalyzer.Core\TimingAnalyzer.Core.csproj" />
     <ProjectReference Include="..\..\src\TimingAnalyzer.Audio\TimingAnalyzer.Audio.csproj" />
     <ProjectReference Include="..\..\src\TimingAnalyzer.Editor\TimingAnalyzer.Editor.csproj" />

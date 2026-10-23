@@ -8,9 +8,9 @@ namespace TimingAnalyzer.Editor.Tests;
 public class OsuFileTests
 {
     [Theory]
-    [InlineData("my-dearest-tv.osu")]
-    [InlineData("m1ll10n-pp.osu")]
-    [InlineData("architecture.osu")]
+    [InlineData("steady-multi.osu")]
+    [InlineData("ramp-mania.osu")]
+    [InlineData("one-red.osu")]
     public void FixturesRoundTripAndOnlyTimingRowsChange(string name)
     {
         byte[] bytes = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", name));

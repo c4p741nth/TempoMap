@@ -11,14 +11,18 @@ public sealed class WaveformControl : Control
 {
     private EditorViewModel? model;
     // Box select: a left drag from empty space that travels more than BoxThreshold px. A shorter one is a click (seek).
+    // With Shift held, a drag from anywhere (red lines included) highlights a range instead (Auto-time range).
     private const double BoxThreshold = 4;
     private double? pressX;
     private double boxX;
-    private bool boxing;
+    private bool boxing, ranging;
     private static readonly Pen Wave = new(Brushes.Teal), Playhead = new(Brushes.Gold, 2);
     private static readonly Pen Selected = new(Brushes.OrangeRed, 4);
     private static readonly IBrush BoxFill = new SolidColorBrush(Color.FromArgb(48, 255, 140, 0));
     private static readonly Pen BoxEdge = new(new SolidColorBrush(Color.FromArgb(160, 255, 140, 0)));
+    private static readonly IBrush RangeFill = new SolidColorBrush(Color.FromArgb(56, 120, 170, 255));
+    private static readonly IBrush MarkFill = new SolidColorBrush(Color.FromArgb(40, 200, 90, 255));
+    private static readonly Pen RangeEdge = new(new SolidColorBrush(Color.FromArgb(200, 120, 170, 255)));
     private static readonly Pen[] GridPens = [new(new SolidColorBrush(Color.Parse("#303741"))),
         new(Brushes.Gray), new(Brushes.MediumPurple), new(Brushes.IndianRed, 2)];
     public WaveformControl()
@@ -58,11 +62,26 @@ public sealed class WaveformControl : Control
             double x = X(line.Time);
             context.DrawLine(GridPens[(int)line.Kind], new(x, 0), new(x, Bounds.Height));
         }
+        // Sections worth a listen (Check sections): a violet band over the section.
+        foreach (var mark in model.Marks)
+        {
+            if (mark.Index >= reds.Count) continue;
+            double left = X(reds[mark.Index].Time), right = mark.Index + 1 < reds.Count ? X(reds[mark.Index + 1].Time) : X(model.DurationMs);
+            if (right < 0 || left > Bounds.Width) continue;
+            context.FillRectangle(MarkFill, new Rect(Math.Max(0, left), 0, Math.Max(1, Math.Min(Bounds.Width, right) - Math.Max(0, left)), Bounds.Height));
+        }
+        // The highlighted range (blue), and while dragging the band being drawn (blue for a range, orange for a box select).
+        if (model.Range is { } range && !(ranging && boxing))
+        {
+            var band = new Rect(X(range.Start), 0, Math.Max(1, X(range.End) - X(range.Start)), Bounds.Height);
+            context.FillRectangle(RangeFill, band);
+            context.DrawRectangle(RangeEdge, band);
+        }
         if (boxing && pressX is { } from)
         {
             var band = new Rect(Math.Min(from, boxX), 0, Math.Abs(boxX - from), Bounds.Height);
-            context.FillRectangle(BoxFill, band);
-            context.DrawRectangle(BoxEdge, band);
+            context.FillRectangle(ranging ? RangeFill : BoxFill, band);
+            context.DrawRectangle(ranging ? RangeEdge : BoxEdge, band);
         }
         double head = X(model.PositionMs);
         context.DrawLine(Playhead, new(head, 0), new(head, Bounds.Height));
@@ -80,9 +99,11 @@ public sealed class WaveformControl : Control
         if (model is null || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         Focus();
         double x = e.GetPosition(this).X;
-        if (!model.BeginDrag(TimeAt(x), 6 * model.SpanMs / Math.Max(1, Bounds.Width), e.KeyModifiers.HasFlag(KeyModifiers.Control)))
+        ranging = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        // Shift: a range drag even over a red line (so a range can start on one). Otherwise a red line is grabbed.
+        if (ranging || !model.BeginDrag(TimeAt(x), 6 * model.SpanMs / Math.Max(1, Bounds.Width), e.KeyModifiers.HasFlag(KeyModifiers.Control)))
         {
-            // Empty space: seek on release if it stays a click, otherwise box-select.
+            // Empty space (or Shift): seek on release if it stays a click, otherwise box-select (Shift: highlight a range).
             pressX = x; boxX = x; boxing = false;
         }
         e.Pointer.Capture(this);
@@ -106,7 +127,8 @@ public sealed class WaveformControl : Control
         if (model?.IsDragging == true) { model.CommitDrag(); e.Handled = true; }
         else if (model is not null && pressX is { } from)
         {
-            if (boxing) model.SelectRange(TimeAt(from), TimeAt(boxX), e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+            if (boxing && ranging) model.SetRange(TimeAt(from), TimeAt(boxX));
+            else if (boxing) model.SelectRange(TimeAt(from), TimeAt(boxX), false);
             else model.Seek(TimeAt(from));
             e.Handled = true;
         }
@@ -120,7 +142,7 @@ public sealed class WaveformControl : Control
     private void EndBox()
     {
         bool repaint = boxing;
-        pressX = null; boxing = false;
+        pressX = null; boxing = false; ranging = false;
         if (repaint) InvalidateVisual();
     }
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)

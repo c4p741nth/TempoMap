@@ -121,6 +121,34 @@ public class MultiBpmTests
     }
 
     [Fact]
+    public void ARangeThatStartsOnARampGetsItsStepsFromTheContext()
+    {
+        // As AStepRampBetweenTwoSectionsGetsItsSteps, with the range highlighted from the ramp's first beat to 1.5 s
+        // after it (Moonlit Occultation, 2026-10-21: 01:48:327 to 02:01 over a 206 → 240 ramp). The slice alone has no
+        // steady part before the ramp to bridge from; the context on each side gives it one. The context is an
+        // experiment the editor does not use (RangeTiming.Analyze, docs/PHASE1-STATUS.md E41).
+        var steady = Beats(1000, 160, 41000).ToList();
+        double rampStart = steady[^1].Item1 + 60000 / 160.0;
+        var ramp = Ramp(rampStart, [150, 145, 140], 8).Select(b => (b.Item1, 0.6)).ToList();
+        double tail = ramp[^1].Item1 + 60000 / 140.0;
+        var truth = steady.Concat(ramp).Concat(Beats(tail, 135, tail + 40000)).ToList();
+        var d = Envelope(truth, truth[^1].Item1 + 2000);
+        double a = rampStart, b = tail + 1500;
+        var lines = RangeTiming.Analyze(d, a, b, null, contextMs: 10000);
+        Assert.All(lines, s => Assert.InRange(s.TimeMs, a, b));
+        var inRange = truth.Select(t => t.Item1).Where(t => t >= lines[0].TimeMs && t < b).ToArray();
+        var errors = inRange.Select(t => Error(lines, t)).Order().ToArray();
+        Assert.True(errors[errors.Length * 9 / 10] < 6, $"90th percentile error {errors[errors.Length * 9 / 10]:0.0} ms; " +
+            string.Join(", ", lines.Select(s => $"{s.TimeMs:0}@{s.Bpm:0.###}")));
+        Assert.True(lines[0].TimeMs < a + 60000 / 150.0, $"first red line at {lines[0].TimeMs:0}, the range starts at {a:0}");
+        // The slice alone loses the ramp beats.
+        var alone = RangeTiming.Analyze(d, a, b);
+        var aloneErrors = inRange.Select(t => Error(alone, t)).Order().ToArray();
+        Assert.True(aloneErrors[aloneErrors.Length * 9 / 10] > errors[errors.Length * 9 / 10], $"slice alone: 90th percentile error " +
+            $"{aloneErrors[aloneErrors.Length * 9 / 10]:0.0} ms; " + string.Join(", ", alone.Select(s => $"{s.TimeMs:0}@{s.Bpm:0.###}")));
+    }
+
+    [Fact]
     public void AStraightTempoSwitchGetsNoRampLines()
     {
         double change = 1000 + 96 * 60000 / 160.0;
@@ -160,6 +188,25 @@ public class MultiBpmTests
         Assert.Equal(found.Select(s => s.TimeMs), fixedUp.Select(s => s.TimeMs));
         // Above the cap nothing is doubled.
         Assert.Equal(found, MultiBpmAnalyzer.DoubleHalfTempo(d, found, change + 30000, new MultiBpmOptions { HalfTempoMaxBpm = 100 }));
+    }
+
+    [Fact]
+    public void ATripletLevelAnswerIsDividedByThreeAndAnEvenOneIsNot()
+    {
+        // 95 BPM with triplets: onsets at 285 BPM, every third (the beat) strong. The line was found at 285 on a triplet.
+        double length = 60000 / 285.0, end = 41000;
+        var triplets = Beats(1000, 285, end).Select((b, i) => (b.Item1, i % 3 == 1 ? 1.0 : 0.3)).ToList();
+        var d = Envelope(triplets, end + 2000);
+        var fast = new TimingSection(1000, 285);
+        var slow = MultiBpmAnalyzer.Triplet(d, fast, end, new MultiBpmOptions());
+        Assert.Equal(95, slow.Bpm);
+        Assert.Equal(1000 + length, slow.TimeMs, 6);
+        // Even onsets: every beat is a beat.
+        var even = Envelope(Beats(1000, 285, end), end + 2000);
+        Assert.Equal(fast, MultiBpmAnalyzer.Triplet(even, fast, end, new MultiBpmOptions()));
+        // Below 240 BPM the measure is not trusted (Veil Of Maya - Mikasa, a 220 map, folds like this).
+        var at220 = Envelope(Beats(1000, 220, end).Select((b, i) => (b.Item1, i % 3 == 1 ? 1.0 : 0.3)), end + 2000);
+        Assert.Equal(new TimingSection(1000, 220), MultiBpmAnalyzer.Triplet(at220, new TimingSection(1000, 220), end, new MultiBpmOptions()));
     }
 
     [Fact]
@@ -261,5 +308,42 @@ public class MultiBpmTests
         var after = Analyzer.AnalyzeEnvelope(d);
         Assert.Equal(before.Bpm, after.Bpm);
         Assert.Equal(before.OffsetInternal, after.OffsetInternal);
+    }
+
+    [Fact]
+    public void SectionCheckMarksAMisplacedLineAndLeavesARightOneAlone()
+    {
+        // 150 BPM from 1 000 ms, a quieter off-beat between: the right line gets no mark, one 60 ms late a shift back.
+        var d = Envelope(Beats(1000, 150, 60000, offBeat: 0.4), 62000);
+        var right = Assert.Single(SectionCheck.Check(d, [new TimingSection(1000, 150)], 60000))!;
+        Assert.False(right.Weak);
+        Assert.Null(right.ShiftMs);
+        Assert.Null(right.BestRatio);
+        var late = Assert.Single(SectionCheck.Check(d, [new TimingSection(1060, 150)], 60000))!;
+        // Each beat takes the strongest onset within ±3 ms (SectionCheck.ToleranceMs), so the move is exact to that.
+        Assert.InRange(late.ShiftMs!.Value, -60 - SectionCheck.ToleranceMs, -60 + SectionCheck.ToleranceMs);
+        // On the off-beats (half a beat late) the line is weak and the move is half a beat.
+        var off = Assert.Single(SectionCheck.Check(d, [new TimingSection(1200, 150)], 60000))!;
+        Assert.InRange(Math.Abs(off.ShiftMs!.Value), 200 - SectionCheck.ToleranceMs, 200 + SectionCheck.ToleranceMs);
+        // A section shorter than 8 beats is a ramp step: not judged.
+        Assert.Null(SectionCheck.Check(d, [new TimingSection(1000, 150), new TimingSection(3000, 150)], 60000)[0]);
+    }
+
+    [Fact]
+    public void ARangeIsAnalyzedOnItsOwnWithAbsoluteTimes()
+    {
+        // As ATempoChangeGetsItsOwnRedLineAtTheChange: 128 BPM, then 160 BPM from 40.8 s; the range 45-75 s sees only 160.
+        double change = 1000 + 85 * 60000 / 128.0;
+        var d = Envelope(Beats(1000, 128, change).Concat(Beats(change, 160, 80000)), 82000);
+        var only = Assert.Single(RangeTiming.Analyze(d, 45000, 75000));
+        Assert.Equal(160, only.Bpm); // Whole BPM.
+        double k = Math.Round((only.TimeMs - change) / 375);
+        Assert.True(Math.Abs(only.TimeMs - (change + 375 * k)) < 2, $"red line at {only.TimeMs:0.0} is not on a 160 BPM beat");
+        Assert.InRange(only.TimeMs, 45000, 45000 + 375);
+        // A range across the change gets a red line for each tempo.
+        var both = RangeTiming.Analyze(d, 20000, 75000);
+        Assert.Equal([128.0, 160.0], both.Select(s => Math.Round(s.Bpm, 1)));
+        Assert.InRange(both[1].TimeMs, change - 60000 / 128.0, change + 375);
+        Assert.Empty(RangeTiming.Analyze(d, 10000, 10000 + RangeTiming.MinimumMs - 1));
     }
 }

@@ -56,7 +56,7 @@ public class SelectionTests
     public async Task MultiShiftMovesEachSelectedLineByItsOwnBeatInOneUndoStep()
     {
         using var vm = new EditorViewModel(_ => throw new InvalidOperationException(), _ => new ViewModelTests.FakePlayback());
-        await vm.LoadAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "my-dearest-tv.osu"));
+        await vm.LoadAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "steady-multi.osu"));
         var original = vm.Edits.RedLines.ToArray();
         Assert.NotEqual(original[2].BeatLength, original[3].BeatLength);
         vm.SelectRange(original[2].Time, original[3].Time, false);
