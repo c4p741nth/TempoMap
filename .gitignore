@@ -17,3 +17,5 @@ TestResults/
 .venv-ml/
 # Decompiler output of the original exe: kept locally, not published
 reverse/
+# Release zips and their staging folder (tools/package-release.ps1)
+artifacts/

@@ -1,0 +1,64 @@
+name: CI
+
+# Every pull request into develop or main, and every push to develop: build, test, and (for a pull request into main,
+# the one that will release) make sure the release zip can be built. Nothing is published here.
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      # The golden tests compare Core with stages dumped from the original exe on the author's machine
+      # (tests/golden is git-ignored), so they cannot run here; every other test does.
+      - name: Test
+        run: dotnet test -c Release --no-build --filter "FullyQualifiedName!~GoldenTests"
+
+  package:
+    # Only the pull request that will release: the zip is built and kept as a workflow artifact for 7 days.
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    needs: build-test
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Package
+        id: package
+        shell: pwsh
+        run: ./tools/package-release.ps1 -OutputDirectory artifacts
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: |
+            ${{ steps.package.outputs.zip }}
+            ${{ steps.package.outputs.sha256file }}
+          retention-days: 7
