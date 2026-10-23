@@ -1,0 +1,8 @@
+# Keeps the actions in .github/workflows current: a pull request into develop when one has a new release.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: develop
+    schedule:
+      interval: monthly

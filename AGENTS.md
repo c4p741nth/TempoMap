@@ -23,7 +23,8 @@ E34). Test fixtures are synthetic (`tools/make_fixtures.py`): never commit someo
 - Do one task at a time. Build and test until green, then `git commit`. Never leave verified work
   uncommitted. Push or release only when the user asks; releases are tagged vYYYYMMDD.n (the n-th that day), with
   the App csproj `InformationalVersion` set to match, and ship a self-contained win-x64 zip without .pdb files and
-  without the unused ffmpeg libraries.
+  without the unused ffmpeg libraries. `tools/package-release.ps1` builds that zip and `.github/workflows/release.yml`
+  drafts the GitHub release from `main`; branches, CI and the whole flow are in `docs/RELEASE.md`.
 - Count things with a script, not by eye, when reporting numbers (failures, mismatches, sizes).
 - If the same parity mismatch survives two fix attempts, stop. Report the stage-by-stage diff
   instead of loosening thresholds.
