@@ -5,18 +5,7 @@
         Title="{Binding WindowTitle}" Width="1280" Height="720" MinWidth="900" MinHeight="500"
         Icon="/Assets/icon.ico" DragDrop.AllowDrop="True">
   <Window.Styles>
-    <!-- One control height (28 px) for buttons, boxes and drop-downs: Fluent's 32 px drop-downs looked heavier than
-         the labels beside them. -->
-    <Style Selector="Button, RepeatButton">
-      <Setter Property="Padding" Value="10,3" /><Setter Property="MinHeight" Value="28" />
-    </Style>
-    <Style Selector="ComboBox">
-      <Setter Property="MinHeight" Value="28" /><Setter Property="Padding" Value="8,2,4,2" />
-    </Style>
-    <Style Selector="TextBox">
-      <Setter Property="MinHeight" Value="28" /><Setter Property="Padding" Value="6,4" />
-    </Style>
-    <!-- Toolbars: a label sits 6 px from its control and groups 20 px apart (whitespace, not rules: a rule that
+    <!-- Control heights (28 px) are in Styles/Workspace.axaml, shared with every dialog. Toolbars: a label sits 6 px from its control and groups 20 px apart (whitespace, not rules: a rule that
          wrapped to the start of a line looked like a stray bar). Every control centred on one line. -->
     <Style Selector="WrapPanel.toolbar">
       <Setter Property="ItemSpacing" Value="6" /><Setter Property="LineSpacing" Value="6" />
@@ -55,14 +44,10 @@
     </Style>
   </Window.Styles>
   <DockPanel>
-    <Border DockPanel.Dock="Top" Background="{DynamicResource WorkspaceChrome}" BorderBrush="{DynamicResource WorkspaceEdge}" BorderThickness="0,0,0,1" Padding="16,8">
+    <!-- The menu opens the bar, where every desktop app has it; the logo is a small mark beside the theme switch. -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource WorkspaceChrome}" BorderBrush="{DynamicResource WorkspaceEdge}" BorderThickness="0,0,0,1" Padding="8,3,16,3">
       <Grid ColumnDefinitions="Auto,*,Auto">
-        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-          <Image x:Name="BrandIcon" Source="/Assets/TempoMap.png" Width="32" Height="32"
-                 AutomationProperties.Name="TempoMap logo" />
-          <TextBlock Text="TempoMap" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
-        </StackPanel>
-    <Menu x:Name="MainMenu" Grid.Column="1" Margin="20,0,0,0" VerticalAlignment="Center" IsEnabled="{Binding CanInteract}">
+    <Menu x:Name="MainMenu" Grid.Column="0" VerticalAlignment="Center" IsEnabled="{Binding CanInteract}">
       <MenuItem Header="_File">
         <MenuItem Header="_Open .osu..." Click="OpenOsu" InputGesture="Ctrl+O" />
         <MenuItem Header="Open _audio..." Click="OpenAudio" InputGesture="Ctrl+Shift+O" />
@@ -111,6 +96,10 @@
         <MenuItem Header="Clear range" Command="{Binding ClearRangeCommand}" />
         <Separator />
         <MenuItem Header="Shift / nudge selected">
+        <MenuItem Header="Shift earlier by the beat step" Command="{Binding ShiftBeatStepCommand}" CommandParameter="-1" InputGesture="Ctrl+Alt+Left"
+                  ToolTip.Tip="A fraction of each selected line's own beat, chosen in the Shift row." />
+        <MenuItem Header="Shift later by the beat step" Command="{Binding ShiftBeatStepCommand}" CommandParameter="1" InputGesture="Ctrl+Alt+Right" />
+        <Separator />
         <MenuItem Header="Shift selected −1 ms" Command="{Binding ShiftMsCommand}" CommandParameter="-1" InputGesture="Ctrl+Left" />
         <MenuItem Header="Shift selected +1 ms" Command="{Binding ShiftMsCommand}" CommandParameter="1" InputGesture="Ctrl+Right" />
         <MenuItem Header="Shift selected −5 ms" Command="{Binding ShiftMsCommand}" CommandParameter="-5" InputGesture="Ctrl+Shift+Left" />
@@ -150,7 +139,7 @@
         <Separator />
         <MenuItem Header="Keyboard shortcuts / copy profiles…" Click="ShowPreferences" />
         <MenuItem Header="_Restore default settings" Click="RestoreDefaults"
-                  ToolTip.Tip="Volumes, metronome, follow, speed, beat snap, auto-time mode, table tab and window size back to their defaults. Settings are saved when the editor closes." />
+                  ToolTip.Tip="Volumes, metronome, follow, speed, beat snap, auto-time mode, table tab, waveform view, loop, table width, Timing tools and window size back to their defaults. Saved when the editor closes." />
       </MenuItem>
       <MenuItem Header="_Workspace">
         <MenuItem Header="Listening / display / review…" Click="ShowWorkspaceTools" InputGesture="F3" />
@@ -162,14 +151,19 @@
       </MenuItem>
     </Menu>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,10,0" VerticalAlignment="Center" ToolTip.Tip="TempoMap">
+            <Image x:Name="BrandIcon" Source="/Assets/TempoMap.png" Width="22" Height="22" AutomationProperties.Name="TempoMap logo" />
+            <TextBlock Text="TempoMap" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource WorkspaceMuted}" VerticalAlignment="Center" />
+          </StackPanel>
           <Path Data="M8,1 A7,7 0 1 0 8,15 Z M8,1 A7,7 0 0 1 8,15" Stroke="{DynamicResource WorkspaceMuted}" StrokeThickness="1.5" Fill="{DynamicResource WorkspaceAccentSoft}" Width="16" Height="16" VerticalAlignment="Center" />
           <ComboBox x:Name="ThemePicker" Width="100" ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"
                     ToolTip.Tip="Appearance: Dark, Light, or follow your system. Remembered between sessions." AutomationProperties.Name="Appearance theme" />
         </StackPanel>
       </Grid>
     </Border>
-    <Grid Margin="12,8,12,8" ColumnDefinitions="*,6,350">
-      <GridSplitter Grid.Column="1" ResizeDirection="Columns" Background="{DynamicResource WorkspaceEdge}" HorizontalAlignment="Stretch" Margin="2,0" AutomationProperties.Name="Resize timing table" />
+    <Grid x:Name="BodyGrid" Margin="12,8,12,8" ColumnDefinitions="*,6,350">
+      <!-- The bar between the waveform and the table is invisible until the pointer is over it; the width is remembered. -->
+      <GridSplitter x:Name="TableSplitter" Grid.Column="1" ResizeDirection="Columns" HorizontalAlignment="Stretch" Margin="2,0" Cursor="SizeWestEast" AutomationProperties.Name="Resize timing table" />
       <!-- Docked first, so the timing table spans the full window height instead of the space below the toolbars. -->
       <Border x:Name="TimingCard" Classes="surface" Grid.Column="2" MinWidth="330" Padding="10" Margin="8,0,0,0">
         <!-- The details scroll on a short window (MainWindow.FitPanels) so the table keeps at least MinListHeight. -->
@@ -185,7 +179,7 @@
                       ToolTip.Tip="All: red and green lines. Timing: red timing points. Inherited: green points (SV, volume, kiai). Click to select; double-click to seek. Ctrl+click adds a row, Shift+click selects a range. Ctrl+A selects all, Ctrl+C copies. + adds the tab's point type; Ctrl+G adds green from any tab." />
             </DockPanel>
           </StackPanel>
-          <Grid x:Name="TableHeader" Grid.Row="1" Classes="tableHeader" ColumnDefinitions="14,76,60,44,42,32,22" Margin="4,4,4,4" Height="20" VerticalAlignment="Center" Opacity="0.75">
+          <Grid x:Name="TableHeader" Grid.Row="1" Classes="tableHeader" ColumnDefinitions="14,76,56,44,52,32,22" Margin="4,4,4,4" Height="20" VerticalAlignment="Center" Opacity="0.75">
             <TextBlock Grid.Column="1" Text="Offset" /><TextBlock Grid.Column="2" Text="BPM / SV" />
             <TextBlock Grid.Column="3" Text="Meter" ToolTip.Tip="Beats per bar; nb = no bar line (osu!'s omit first barline)." />
             <TextBlock Grid.Column="4" Text="Sample" ToolTip.Tip="N/S/D = Normal/Soft/Drum sample set; C is custom sample index (0 = default)." /><TextBlock Grid.Column="5" Text="Vol." /><TextBlock Grid.Column="6" Text="Ki" ToolTip.Tip="Kiai: on from this point until an effects change." />
@@ -195,7 +189,7 @@
             <!-- No tooltip on the table itself: a tooltip popup over the rows took the clicks meant for them. -->
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="e:TimingRow">
-                <Grid ColumnDefinitions="14,76,60,44,42,32,22">
+                <Grid ColumnDefinitions="14,76,56,44,52,32,22">
                   <TextBlock Text="{Binding Marker}" Classes="pointMarker" Classes.green="{Binding IsGreen}" Classes.overlap="{Binding Overlaps}" />
                   <TextBlock Grid.Column="1" Text="{Binding Offset}" FontFamily="Consolas,monospace" />
                   <TextBlock Grid.Column="2" Text="{Binding Value}" />
@@ -234,7 +228,7 @@
               </WrapPanel>
               </StackPanel>
               </Border>
-              <Expander Header="Timing tools" IsExpanded="False" HorizontalAlignment="Stretch"><StackPanel Spacing="6">
+              <Expander x:Name="TimingToolsExpander" Header="Timing tools" IsExpanded="True" HorizontalAlignment="Stretch"><StackPanel Spacing="6">
               <TextBlock Text="Detection" Classes="section" />
               <DockPanel>
                 <Button DockPanel.Dock="Right" Classes="icon" Content="×" Command="{Binding ClearRangeCommand}" IsVisible="{Binding HasRange}" Margin="6,0,0,0"
@@ -294,13 +288,21 @@
                 <TextBlock Text="Speed" Margin="6,0,0,0" />
                 <ComboBox x:Name="SpeedCombo" Width="76" ItemsSource="{Binding Speeds}" SelectedItem="{Binding SelectedSpeed, Mode=TwoWay}" />
               </StackPanel>
-              <StackPanel x:Name="VolumeGroup" Classes="group">
-                <CheckBox Content="Metronome" IsChecked="{Binding ClickEnabled, Mode=TwoWay}" ToolTip.Tip="M" />
-                <Slider x:Name="MetronomeVolumeSlider" AutomationProperties.Name="Metronome volume" Width="60" Minimum="0" Maximum="100" Value="{Binding ClickVolumePercent, Mode=TwoWay}" ToolTip.Tip="{Binding ClickVolumeLabel}" />
-                <TextBlock x:Name="MetronomePercentLabel" Width="36" Text="{Binding ClickVolumeLabel}" TextAlignment="Right" />
-                <TextBlock Text="Music" Margin="6,0,0,0" />
-                <Slider x:Name="MusicVolumeSlider" AutomationProperties.Name="Music volume" Width="60" Minimum="0" Maximum="100" Value="{Binding MusicVolumePercent, Mode=TwoWay}" ToolTip.Tip="{Binding MusicVolumeLabel}" />
-                <TextBlock x:Name="MusicPercentLabel" Width="36" Text="{Binding MusicVolumeLabel}" TextAlignment="Right" />
+              <!-- The metronome switch stays on every window width: below 1100 px it shrinks to the ♪ button and its sliders
+                   give way (MainWindow.FitPanels); a second row of transport would cost the waveform its minimum height. -->
+              <StackPanel Classes="group">
+                <CheckBox x:Name="MetronomeCheckBox" Content="Metronome" IsChecked="{Binding ClickEnabled, Mode=TwoWay}"
+                          ToolTip.Tip="M. Hold Alt+M to mute it for a moment. The volume sliders sit here on a wide window, otherwise under Workspace (F3)." />
+                <ToggleButton x:Name="MetronomeToggle" Content="♪" IsVisible="False" IsChecked="{Binding ClickEnabled, Mode=TwoWay}" Width="32" MinHeight="28" Padding="0" FontSize="16"
+                              HorizontalContentAlignment="Center" AutomationProperties.Name="Metronome"
+                              ToolTip.Tip="Metronome (M). Hold Alt+M to mute it for a moment. Volume sliders are under Workspace (F3) on a narrow window." />
+                <StackPanel x:Name="VolumeGroup" Classes="group">
+                  <Slider x:Name="MetronomeVolumeSlider" AutomationProperties.Name="Metronome volume" Width="60" Minimum="0" Maximum="100" Value="{Binding ClickVolumePercent, Mode=TwoWay}" ToolTip.Tip="{Binding ClickVolumeLabel}" />
+                  <TextBlock x:Name="MetronomePercentLabel" Width="36" Text="{Binding ClickVolumeLabel}" TextAlignment="Right" />
+                  <TextBlock Text="Music" Margin="6,0,0,0" />
+                  <Slider x:Name="MusicVolumeSlider" AutomationProperties.Name="Music volume" Width="60" Minimum="0" Maximum="100" Value="{Binding MusicVolumePercent, Mode=TwoWay}" ToolTip.Tip="{Binding MusicVolumeLabel}" />
+                  <TextBlock x:Name="MusicPercentLabel" Width="36" Text="{Binding MusicVolumeLabel}" TextAlignment="Right" />
+                </StackPanel>
               </StackPanel>
             </WrapPanel>
               <Grid ColumnDefinitions="*,8,Auto" IsVisible="{Binding IsBusy}">
@@ -332,6 +334,40 @@
                 </StackPanel>
             </WrapPanel>
             </Border>
+            <!-- Shift: fine-tune red lines by a fraction of their beat or by milliseconds, and their BPM by a step. -->
+            <Border x:Name="ShiftBar" Classes="toolGroup">
+            <WrapPanel Classes="toolbar groups" IsEnabled="{Binding CanInteract}">
+              <TextBlock Text="Shift" Classes="group"
+                         ToolTip.Tip="Moves the red lines selected in the table (Ctrl+A selects them all). Green lines never move." />
+              <StackPanel Classes="group">
+                <Button x:Name="ShiftBeatEarlierButton" Classes="icon" Content="❮" Command="{Binding ShiftBeatStepCommand}" CommandParameter="-1" AutomationProperties.Name="Shift earlier by beat step"
+                        ToolTip.Tip="Ctrl+Alt+←. Move earlier by the beat step, a fraction of each line's own beat. One undo step." />
+                <ComboBox x:Name="ShiftBeatStepBox" Width="76" ItemsSource="{Binding ShiftBeatSteps}" SelectedItem="{Binding SelectedShiftBeatStep, Mode=TwoWay}" AutomationProperties.Name="Beat step"
+                          ToolTip.Tip="Beat step, from 1/1 to 1/64 of the line's own beat. Remembered between sessions." />
+                <Button x:Name="ShiftBeatLaterButton" Classes="icon" Content="❯" Command="{Binding ShiftBeatStepCommand}" CommandParameter="1" AutomationProperties.Name="Shift later by beat step"
+                        ToolTip.Tip="Ctrl+Alt+→. Move later by the beat step. One undo step." />
+                <TextBlock Text="beat" />
+              </StackPanel>
+              <StackPanel Classes="group">
+                <Button x:Name="ShiftMsEarlierButton" Classes="icon" Content="❮" Command="{Binding ShiftMsStepCommand}" CommandParameter="-1" AutomationProperties.Name="Shift earlier by ms step"
+                        ToolTip.Tip="Move earlier by the ms step. Ctrl+← moves 1 ms, Ctrl+Shift+← 5 ms. One undo step." />
+                <ComboBox x:Name="ShiftMsStepBox" Width="68" ItemsSource="{Binding ShiftMsSteps}" SelectedItem="{Binding SelectedShiftMsStep, Mode=TwoWay}" AutomationProperties.Name="Millisecond step"
+                          ToolTip.Tip="Millisecond step. Remembered between sessions." />
+                <Button x:Name="ShiftMsLaterButton" Classes="icon" Content="❯" Command="{Binding ShiftMsStepCommand}" CommandParameter="1" AutomationProperties.Name="Shift later by ms step"
+                        ToolTip.Tip="Move later by the ms step. Ctrl+→ moves 1 ms, Ctrl+Shift+→ 5 ms. One undo step." />
+                <TextBlock Text="ms" />
+              </StackPanel>
+              <StackPanel Classes="group">
+                <RepeatButton x:Name="BpmLowerButton" Classes="icon" Content="❮" Command="{Binding NudgeBpmCommand}" CommandParameter="-1" AutomationProperties.Name="Lower BPM one step"
+                              ToolTip.Tip="Ctrl+↓. Lower the BPM of the selected red lines to the previous multiple of the step; their times stay. Hold to keep going: a run is one undo step." />
+                <ComboBox x:Name="BpmStepBox" Width="84" ItemsSource="{Binding BpmSteps}" SelectedItem="{Binding SelectedBpmStep, Mode=TwoWay}" AutomationProperties.Name="BPM step"
+                          ToolTip.Tip="BPM step: 0.001 is the finest osu! shows. Ctrl+Shift+↑/↓ takes ten steps. Remembered between sessions." />
+                <RepeatButton x:Name="BpmRaiseButton" Classes="icon" Content="❯" Command="{Binding NudgeBpmCommand}" CommandParameter="1" AutomationProperties.Name="Raise BPM one step"
+                              ToolTip.Tip="Ctrl+↑. Raise the BPM of the selected red lines to the next multiple of the step; their times stay. Hold to keep going: a run is one undo step." />
+                <TextBlock Text="BPM" />
+              </StackPanel>
+            </WrapPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
         <Border x:Name="BottomPanel" Grid.Row="3" Classes="surface" Padding="10,6" Margin="0,6,0,0">
@@ -344,10 +380,17 @@
         <DockPanel>
           <Grid x:Name="WaveformHeader" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="12,8,12,6">
             <TextBlock Text="WAVEFORM" Classes="caption" VerticalAlignment="Center" />
-            <Button x:Name="ReviewProposalButton" Grid.Column="2" Content="Review…" Click="ShowProposalReview" IsVisible="{Binding HasProposal}" MinHeight="20" Height="22" Padding="6,0" FontSize="11" />
+            <!-- The range controls sit on the waveform they act on: Shift+drag highlights, Play range listens, Loop repeats. -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <CheckBox x:Name="LoopCheckBox" Content="Loop" MinHeight="22" FontSize="11" IsChecked="{Binding LoopEnabled, Mode=TwoWay}"
+                        ToolTip.Tip="Repeat the highlighted range (Shift+drag on the waveform) while you listen. The pre-roll beats are set under Workspace (F3)." />
+              <Button x:Name="PlayRangeQuickButton" Content="Play range" Click="PlayRangeClicked" IsEnabled="{Binding HasRange}" MinHeight="20" Height="22" Padding="6,0" FontSize="11"
+                      ToolTip.Tip="Ctrl+Space. Start at the highlighted range, minus the pre-roll beats. Loop repeats it; otherwise playback runs on. Highlight: Shift+drag or Shift+←/→." />
+              <Button x:Name="ReviewProposalButton" Content="Review…" Click="ShowProposalReview" IsVisible="{Binding HasProposal}" MinHeight="20" Height="22" Padding="6,0" FontSize="11" />
+            </StackPanel>
             <TextBlock Grid.Column="1" Text="{Binding SongTitle}" Margin="12,0,0,0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SongTitle}" />
           </Grid>
-          <local:OverviewControl x:Name="SongOverview" DockPanel.Dock="Bottom" Height="20" Margin="8,0" AutomationProperties.Name="Song overview; click or drag to seek" />
+          <local:OverviewControl x:Name="SongOverview" DockPanel.Dock="Bottom" Height="22" Margin="8,0,8,8" AutomationProperties.Name="Song overview; click or drag to seek" />
           <Grid x:Name="SeekBar" DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto" Margin="8,6">
             <Button x:Name="JumpStartButton" Classes="icon" Command="{Binding JumpToStartCommand}" ToolTip.Tip="Go to song start (Home)" AutomationProperties.Name="Go to song start">
               <Path Data="M1,1 L3,1 L3,15 L1,15 Z M14,1 L14,15 L5,8 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="16" />

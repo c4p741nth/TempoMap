@@ -27,6 +27,13 @@
           <SolidColorBrush x:Key="WaveformRedBrush">#E46D72</SolidColorBrush>
           <SolidColorBrush x:Key="WaveformPlayheadBrush">#F3C653</SolidColorBrush>
           <SolidColorBrush x:Key="WaveformSelectedBrush">#FF9365</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayLabelBrush">#7F92A5</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayGhostBrush">#3FD4E8</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayGhostBeatBrush">#4C7C8C</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayOnsetBrush">#FFA94D</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayKiaiBrush">#64DC9614</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayBookmarkBrush">#E08AE0</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayRangeBrush">#78AAFF</SolidColorBrush>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Light">
           <SolidColorBrush x:Key="WorkspaceCanvas">#EDF2F6</SolidColorBrush>
@@ -53,6 +60,13 @@
           <SolidColorBrush x:Key="WaveformRedBrush">#C84B54</SolidColorBrush>
           <SolidColorBrush x:Key="WaveformPlayheadBrush">#A86C00</SolidColorBrush>
           <SolidColorBrush x:Key="WaveformSelectedBrush">#C44E20</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayLabelBrush">#5E7384</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayGhostBrush">#0A7FA0</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayGhostBeatBrush">#6FA3B5</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayOnsetBrush">#C46A00</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayKiaiBrush">#66B87A00</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayBookmarkBrush">#9B3FA0</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayRangeBrush">#3B6FD0</SolidColorBrush>
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
     </ResourceDictionary>
@@ -80,6 +94,16 @@
     <Setter Property="Foreground" Value="{DynamicResource WorkspaceMuted}" />
     <Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Margin" Value="0,8,0,2" />
   </Style>
+  <!-- One control height (28 px) for buttons, boxes and drop-downs in every window: Fluent's 32 px drop-downs looked heavier than the labels beside them. -->
+  <Style Selector="Button, RepeatButton">
+    <Setter Property="Padding" Value="10,3" /><Setter Property="MinHeight" Value="28" />
+  </Style>
+  <Style Selector="ComboBox">
+    <Setter Property="MinHeight" Value="28" /><Setter Property="Padding" Value="8,2,4,2" />
+  </Style>
+  <Style Selector="TextBox">
+    <Setter Property="MinHeight" Value="28" /><Setter Property="Padding" Value="6,4" />
+  </Style>
   <Style Selector="Button, RepeatButton">
     <Setter Property="CornerRadius" Value="6" /><Setter Property="BorderThickness" Value="1" />
     <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
@@ -101,11 +125,73 @@
     <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceAccentHover}" />
     <Setter Property="Foreground" Value="{DynamicResource WorkspaceAccentInk}" />
   </Style>
-  <Style Selector="TextBox, ComboBox">
+  <Style Selector="Button.danger">
+    <Setter Property="Foreground" Value="{DynamicResource TimingRedBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource TimingRedBrush}" />
+  </Style>
+  <Style Selector="TextBox, ComboBox, NumericUpDown">
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
     <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
     <Setter Property="Foreground" Value="{DynamicResource WorkspaceText}" />
+  </Style>
+  <Style Selector="NumericUpDown">
+    <Setter Property="MinHeight" Value="28" />
+  </Style>
+  <!-- Lists: a frame so an empty list still reads as one, and a selection colour that keeps the text legible in both themes. -->
+  <Style Selector="ListBox">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
+    <Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="8" /><Setter Property="Padding" Value="2" />
+  </Style>
+  <Style Selector="ListBox ListBoxItem:selected /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceSelection}" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceText}" />
+  </Style>
+  <!-- Fluent's horizontal slider is 50 px tall (the thumb and track sit in the middle of reserved tick rows), which made the playback card 22 px
+       taller than the Auto-time and Shift cards. A negative margin gives back the empty rows: it draws as before but takes 28 px of layout, the
+       height of a button. (Setting Height = 28 cut the thumb in half.) -->
+  <Style Selector="Slider:horizontal">
+    <Setter Property="Margin" Value="0,-11" />
+  </Style>
+  <!-- Expanders (Timing tools): Fluent's own header is near-black and its content grey in Dark, white and grey in Light. -->
+  <Style Selector="Expander">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+  <Style Selector="Expander /template/ ToggleButton#ExpanderHeader">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceText}" />
+  </Style>
+  <Style Selector="Expander /template/ Border#ExpanderContent">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
+  </Style>
+  <!-- Splitters: no bar at rest; a soft accent while the pointer is over, the accent itself while dragging. The resize cursor stays. -->
+  <Style Selector="GridSplitter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="GridSplitter:pointerover">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceAccentSoft}" />
+  </Style>
+  <Style Selector="GridSplitter:pressed">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceAccent}" />
+  </Style>
+  <Style Selector="TextBlock.title">
+    <Setter Property="FontSize" Value="16" /><Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.hint">
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceMuted}" /><Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="TextBlock.error">
+    <Setter Property="Foreground" Value="{DynamicResource TimingRedBrush}" />
+  </Style>
+  <Style Selector="Border.chip">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" /><Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="5" /><Setter Property="Padding" Value="7,2" />
   </Style>
   <Style Selector="Menu">
     <Setter Property="Background" Value="Transparent" />
@@ -123,7 +209,12 @@
     <Setter Property="Background" Value="{DynamicResource WorkspaceSelection}" />
     <Setter Property="Foreground" Value="{DynamicResource WorkspaceText}" />
   </Style>
-  <Style Selector="TabStripItem:selected">
+  <!-- Tab titles of the timing table and of the tool windows: compact, muted until selected (Fluent's idle tab is near-invisible in Light). -->
+  <Style Selector="TabStripItem, TabItem">
+    <Setter Property="FontSize" Value="13" /><Setter Property="MinHeight" Value="28" /><Setter Property="Padding" Value="10,3" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceMuted}" />
+  </Style>
+  <Style Selector="TabStripItem:selected, TabItem:selected">
     <Setter Property="Foreground" Value="{DynamicResource WorkspaceAccent}" />
   </Style>
   <Style Selector="TextBlock.pointMarker">

@@ -16,7 +16,8 @@ public static class EditorShortcuts
         ["Open beatmap"] = "Ctrl+O", ["Open audio"] = "Ctrl+Shift+O", ["Save beatmap"] = "Ctrl+S", ["Save project"] = "Ctrl+Shift+S",
         ["Metronome"] = "M", ["Follow playhead"] = "F", ["Workspace tools"] = "F3", ["Keys"] = "F1", ["Thai guide"] = "F2",
         ["Play range"] = "Ctrl+Space", ["Swap listening speed"] = "Back", ["Tap BPM"] = "T", ["Mark anchor A"] = "Alt+A", ["Mark anchor B"] = "Alt+B",
-        ["Previous issue"] = "Alt+Left", ["Next issue"] = "Alt+Right"
+        ["Previous issue"] = "Alt+Left", ["Next issue"] = "Alt+Right",
+        ["Shift earlier by beat step"] = "Ctrl+Alt+Left", ["Shift later by beat step"] = "Ctrl+Alt+Right"
     };
 }
 

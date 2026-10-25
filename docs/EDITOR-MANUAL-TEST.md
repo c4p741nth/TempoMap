@@ -376,3 +376,54 @@ Automated checks use real headless MainWindow input at 1280x720 and 900x500. The
 - [ ] The mint logo matches the header/window/taskbar/Explorer; EXE and app title use TempoMap (E53-E54).
   F2 opens the Thai tool guide; close stays visible on
   short windows. File has one Copy all command; selected Copy and the Settings SV mode match the visible rows.
+
+## Main-window controls restored (E58)
+
+- [ ] The **Shift** row sits under Auto-time: ❮ 1/4 ❯ beat, ❮ 1 ❯ ms, ❮ 0.01 ❯ BPM (no scope box). With one red line selected,
+  ❯ beside ms moves it by the chosen step; ❮ moves it back. Each press is one undo step. Pick 1/32 and press ❯ beside beat:
+  the line moves a thirty-second of its own beat. **Ctrl+Alt+→/←** does the same, and Timing > Shift / nudge selected lists them.
+- [ ] Select every line in the table (**Ctrl+A**) and press ❯ beside ms: every red line moves together; green lines stay. Restart the
+  app: the three steps are remembered.
+- [ ] Hold ❯ beside BPM: the BPM keeps rising and one Ctrl+Z undoes the whole run.
+- [ ] At 1280 px wide the transport row shows Metronome with both sliders. Narrow the window below 1100 px: the sliders go
+  and a **♪** button replaces the checkbox; it still toggles the click, and its state matches the checkbox when you widen again.
+- [ ] Shift+drag highlights a range: **Play range** (waveform header) enables and starts at the range minus the pre-roll beats.
+  With **Loop** ticked it repeats the range; with Loop off playback runs on past the end. Clear the range: Play range greys out.
+- [ ] Hover Auto-time, Auto-time range, Check sections, Fill ramp and the Follow box: each tooltip explains the tool after its
+  key (it is no longer cut down to just "Ctrl+T.").
+- [ ] The F3 and keyboard-shortcut windows have normal-size tab titles; the shortcut list ends with the two beat-step keys.
+
+## Windows, dialogs and themes (E59)
+
+- [ ] The menu (File, Edit, Timing, Settings, Workspace, Help) is the first thing at the top left; the small TempoMap mark and the theme
+  switch sit at the top right. Switch Dark, Light and System: the main window, F3, F1, F2, About, Settings > Keyboard shortcuts, Convert
+  audio, Audio diagnostics, the Unsaved changes / Replace red lines / Recover prompts all change together, with readable text.
+- [ ] In Light: the overview (playhead and viewport), the four-row measure view, the proposal ghost grid, onset overlay, SV lane, Kiai
+  strip and bookmark labels are all clearly visible on the pale waveform (they used fixed colours before).
+- [ ] F3 shows cards: Listening (click and volume, range loop, listening speed, tap tempo, A–B anchors, BPM factor) fits without scrolling
+  at the default size; each volume is one line (name, slider, percent). Widen the window to see two columns, narrow it to see one.
+- [ ] F1 lists commands as key chips, the fixed keys and the colour swatches; Change shortcuts… opens the editor; Close/Esc closes.
+- [ ] Prompts have their main action in the accent colour on the right (Save .osu, Replace red lines, Recover selected); Discard changes is red-outlined.
+- [ ] Help > About shows the logo, version and credits. File > Audio diagnostics shows found/missing for ffmpeg and ffprobe, not raw text.
+- [ ] Lists have a visible frame even when empty, and a selected row stays legible in both themes; tab titles are readable in Light.
+
+## Startup, layout and what is remembered (E60)
+
+- [ ] Start the app with **Auto normalize SV** ticked (Settings or the checkbox, then restart) and nothing opened: close it at once. No
+  "Unsaved changes" prompt. Open a song, change nothing, close: no prompt. Add a red line, close: the prompt appears.
+- [ ] The strip under the seek bar has a gap below it; its frame has all four edges and rounded corners. Slide the view to the end:
+  the frame's right edge and the yellow line reach the right end of the strip (the frame covers exactly what the waveform shows).
+- [ ] The bar between the waveform and the table is invisible at rest, shows a soft bar and the ↔ cursor under the pointer, an accent bar while
+  dragging. Drag the table narrower and wider; close and reopen the app: the width is back (never under the table's minimum).
+- [ ] **Timing tools** starts open (theme-coloured header and body, Dark and Light). Fold it, close and reopen: still folded. Unfold it, reopen: open.
+- [ ] Change the waveform layer (F3 > Display), onset overlay, SV/Kiai lanes, Loop, pre-roll and alternate speed; close and reopen: all as left.
+  Settings > Restore default settings brings them, the table width and Timing tools back to their defaults.
+
+## Overview strip, toolbar heights, no scope box (E61)
+
+- [ ] Play a loud song and look at the strip under the seek bar: the mini waveform stays inside the strip with a gap above and below, the
+  frame covers it from top to bottom, and the yellow playhead line is as tall as the frame. (Before, a song with peaks above 1 was drawn about twice as tall as the strip.)
+- [ ] The four-row measure view (F3 > Display) draws each row's wave inside its row on the same loud song.
+- [ ] The playback card (Play/Pause, Follow, Snap, Speed, Metronome and sliders), the Auto-time card and the Shift card are the same height at 1280 px; the slider
+  thumbs are whole (not cut) there and in the seek bar and F3.
+- [ ] The Shift row has no Selected/All box: shifting acts on the lines selected in the table; Ctrl+A in the table then ❯ moves them all.

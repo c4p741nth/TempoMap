@@ -33,6 +33,11 @@ F01–F18, A1/A2/A3 and all B/C are implemented and verified. A4/A5/A7 were expl
 then the listening/osu! acceptance checks.
 
 - When: 2026-10-26 · Codex · uncommitted on base 2777d9e. User handles Git; no state mutation/server calls.
+- E58 (same day, Claude Code): the user found the Shift beat/BPM/ms row missing from the main window (the controls lived only in F3 → Listening; who moved them is not recorded).
+  Restored it and brought the other frequent controls back; see PHASE1-STATUS.md E58 and docs/EDITOR-UPGRADE.md "Main-window controls".
+- E61 (same day): overview wave overflow, toolbar card heights, Shift scope box removed; see PHASE1-STATUS.md E61.
+- E60 (same day): startup prompt fix, overview/splitter, remembered layout; see PHASE1-STATUS.md E60.
+- E59 (same day): theme and dialog audit and redo; see PHASE1-STATUS.md E59 and docs/EDITOR-UPGRADE.md "Windows, dialogs and themes".
 - Normal executable: src/TimingAnalyzer.App/bin/Release/net10.0/win-x64/TempoMap.exe; version 20261023.0 unchanged.
 - Release solution 0 warnings/errors; C# 313 passed (Editor 271, Core 42), Python 10 passed.
 - MainWindow 131 checks at 1280x720/900x500 with 553 rows: input/remap/preferences, listening/display/review,

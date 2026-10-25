@@ -16,10 +16,11 @@ ffprobe.exe is optional for diagnostics. Save preserves the original audio refer
 - Highlight a range (Shift+drag or Shift+Left/Right) and press Ctrl+R to re-time just that part.
 - Check sections (Ctrl+K) marks the parts worth a listen; x2 / /2 fix a wrong octave; Fill ramp (Ctrl+L) writes a
   red line per beat between two selected red lines.
-- Hold Left/Right and the playhead runs on, faster the longer you hold. Workspace (F3) shift/nudge tools (or Ctrl+Up/Down)
-  tune the BPM of the selected red lines against the waveform.
+- Hold Left/Right and the playhead runs on, faster the longer you hold. The Shift row under Auto-time moves the selected
+  selected red lines by a beat step or ms, and its BPM arrows (or Ctrl+Up/Down) tune their BPM against the waveform.
 - File > Save project keeps a .tmap session; recovery and an unsaved-work prompt protect edits.
-- F3 opens range loop/pre-roll, tap/anchors, display layers and proposal A/B review. File also exports .osz with audio.
+- Loop and Play range sit on the waveform header. F3 opens pre-roll, tap/anchors, display layers and proposal A/B review.
+  File also exports .osz with audio.
 - Settings > Keyboard shortcuts / copy profiles changes keys and clipboard compensation (default -33 ms).
 - Native Opus decoding is unavailable in this build; use the explicit converter with ffmpeg, then open the result.
 - Help > Keys and colours (F1) lists every shortcut. Settings are kept between runs. Esc closes a dialog.

@@ -93,3 +93,75 @@ The new GUI probes remain local; A4/manual-checklist work was explicitly exclude
 Normal App/Editor/Audio/Core DLL hashes match the exact MainWindow smoke output. The large-meter guard failed
 with DivideByZeroException before widening meter arithmetic (`meter-before.log`). Malformed recovery sections
 are skipped instead of blocking startup; null settings collections use safe defaults.
+
+## Main-window controls (E58, 2026-10-26)
+
+The Shift row (beat, ms and BPM steps) was no longer on the main window: its controls lived only in F3 → Listening (the manual test and a tooltip
+still called it "the Shift row", so it existed before; which change removed it is not recorded). The metronome switch also disappeared on windows
+under 1100 px. The user found it hard to work that way. (This section first also added a Selected/All scope box; E61 removed it again.)
+
+- **Shift row restored** under Auto-time: ❮ ❯ beside beat / ms / BPM steps (and, until E61, a scope box). `Ctrl+Alt+←/→` (configurable: "Shift earlier/later by beat step")
+  and the Timing menu now reach the beat step too; ms and BPM keys are unchanged.
+- **Metronome** stays on the transport row at any width: checkbox with sliders from 1100 px, a ♪ toggle below. A second transport row cost the
+  waveform its 160 px minimum at 900×500 (137 px measured), so the narrow form is one 32 px button.
+- **Loop and Play range** moved to the waveform header, beside the range they act on (no extra height). F3 keeps pre-roll, tap, anchors and the rest.
+- **Defects found while checking:** the tooltip shortener cut every long tip at its first ". ", leaving only the key ("Ctrl+T.") for 6 of 15 long tips
+  (now `MainWindow.ShortTip`); table header "Sample" ran into "Vol." (columns 56/52 px); F3 and preferences tab titles were 24 px; the review list had no label.
+- **Still behind one more click** (unchanged, by design): the "Timing tools" expander is collapsed (Auto-time range/section, Fit offset, Check sections,
+  Multiply BPM, Snap to onsets, BPM from spacing, Fill ramp, Bar line here; all also in the Timing menu); F3 holds tap tempo, anchors, alternate speed,
+  display layers/lanes/measure view, bookmarks, A/B audition and BPM candidates.
+- Validation: headless probe 185 checks (Shift buttons incl. scope All, undo back to start, ♪ toggle, Play range, tooltips; 1280×720 and 900×500),
+  C# 313 passed, Release solution 0 warnings/errors. Screenshots: `.dotnet-home/editor-upgrade/ui/{layout,screen,tools-*,preferences}-*.png`.
+
+## Windows, dialogs and themes (E59, 2026-10-26)
+
+The user asked which windows fall out of the theme or look dated, to move the menu to the top left, and to fix F3. Method: a headless gallery
+(`.dotnet-home/editor-upgrade/gallery`) renders the main window (empty, with song, with proposal, measure view) and every dialog in Dark and
+Light (36 PNG in `gallery/out`); each picture was read. The behavioural probe (`ui`, 185 checks) and C# tests (313) still pass.
+
+- **Found:** all code-built dialogs were bare text with left-aligned buttons and no main action; F1 was a plain text list that overflowed;
+  About had no logo; Audio diagnostics printed a raw `ToolStatus { … }` record; ListBox had no frame (an empty list looked like a pale gap
+  in Light) and a selected row was white on mint in Dark; NumericUpDown had a black border unlike every other control; idle tab titles were
+  near-invisible in Light; the overview, measure view and the waveform overlays (ghost grid, onsets, SV lane, Kiai, bookmarks, time labels)
+  used fixed colours (`Brushes.Gold`, `Cyan`, `Gray`…), poor on Light; F3 was one long column with full-width sliders, the volume value on its own line.
+- **Header:** menu first at the top left; the logo shrank to a 22 px mark with a muted name beside the theme switch (the title bar already
+  names the app); the bar is 11 px lower, which the waveform gets (313 px at 1280×720).
+- **One family:** `Styles/Workspace.axaml` now carries the 28 px control heights, NumericUpDown, ListBox frame/selection, tab titles, and the
+  `primary` / `danger` / `hint` / `title` / `chip` / `error` classes; `MainWindow.Dialogs.cs` holds `NewDialog`, `DialogBody`, `Card`,
+  `ButtonRow`, `LabeledRow` and the dialogs built from them (Choose, Confirm, Recover, About, Keys, Thai guide). Prompts put the main action
+  in the accent colour on the right and Discard in red.
+- **F3:** cards (318 px; two columns at the default 720 px, one when narrow), each slider on one line, the Listening tab fits 720×680 without scrolling.
+- **F1:** command keys as chips, fixed keys, colour swatches that use the same theme brushes as the canvas; Change shortcuts… opens the editor.
+- **Canvas colours:** `CanvasPalette` reads the new `Overlay*` brushes (Dark and Light) and follows a theme change.
+- **Not changed:** the native file pickers follow the OS, not the app theme.
+
+## Startup prompt, overview, layout memory (E60, 2026-10-26)
+
+- **Prompt on a fresh start (bug):** with "Auto normalize SV" remembered on, the saved baseline of an empty timing was captured with it off, so
+  `IsDirty` was true before any file was open and closing asked "Unsaved changes". Reproduced headless (`gallery --startup`: fresh with the choice on →
+  dirty, prompt; off → clean). Fixed twice over: `IsDirty` needs a workspace (audio, beatmap or project), and `ApplySettings` re-bases the saved timing
+  while nothing is open. With a song open the choice still counts as an edit, as it changes what Save writes. Tests: `StartingWithRememberedNormalizeSv…`.
+- **Overview:** the frame logic was right (view 10–20 s of 20 s ends at 100%); what looked short was geometry: the 20 px strip touched the card's rounded
+  bottom, which clipped the frame's bottom edge and the playhead. Now 22 px with a 6 px gap, the frame drawn half a pixel inside with rounded corners, the
+  playhead clamped one pixel off the ends, the wave using 92% of the height.
+- **Splitter:** the bar between waveform and table is transparent at rest, a soft accent under the pointer and the accent while dragging; `Cursor=SizeWestEast`
+  is set explicitly because that cursor is now the only cue.
+- **Timing tools:** starts open, folds with its header, state remembered. Its Expander header/body were Fluent's near-black/grey; now theme colours.
+- **Remembered (new):** waveform layer, onsets, SV/Kiai lanes, four rows, ghost grid, loop, pre-roll, alternate speed, table panel width (338 px up to 60% of
+  the window), Timing tools open. Already remembered: volumes, metronome, follow, speed, snap, Shift steps, BPM step, auto-time choices, table tab, theme,
+  window size and maximised state, shortcuts, copy profiles, recent files. Not yet: window position, F3 window.
+- Validation: C# 315, probe 185 (900×500 still keeps the 160 px waveform), `gallery --layout` (apply → change → close → reopen), Release 0 warnings.
+
+## Overview wave, toolbar heights, scope box removed (E61, 2026-10-26)
+
+- **Scope box removed from the Shift row (user's call, and a mistake of mine):** the user selects the lines in the table first, and `EditorViewModel` already said
+  "The window has no scope box: lines are picked in the timing table (Ctrl+A for all)". E58 had put it back from an outdated manual-test line. The row now acts on the
+  selection; `ShiftScope` stays in the view model (default Selected, covered by the Shift tests) but nothing in the window sets it.
+- **Overview wave drawn outside its strip (real bug, found with the user's own song):** the strip and the measure view scaled peaks by raw value, the main waveform by
+  `0.4 × height ÷ max(1, loudest peak)`. A song with peaks near 1.9 was drawn about twice the strip's height, over the card's bottom edge, so the frame and the playhead (the strip's
+  height) looked smaller than the wave. The synthetic test song never showed it. Both now use `WaveformControl.PeakScale` (the same rule, 92% of the strip at the loudest peak),
+  the strip clips to its bounds, and the gap under it is 8 px.
+- **Toolbar card heights:** the playback card was 72 px against 50 px for Auto-time and Shift because Fluent's horizontal slider is 50 px tall (thumb and track in the middle of reserved tick
+  rows). A style gives it `Margin="0,-11"`: drawn as before, 28 px of layout. (`Height="28"` was tried first and cut the thumbs in half.) The seek bar and F3 sliders shrink the same way:
+  the waveform gained 22 px (347 px at 1280×720).
+- Validation: probe 189 checks (adds: no scope box, Ctrl+A then shift moves every line, card heights equal), C# 315, Release 0 warnings, gallery pictures with the user's real song read.

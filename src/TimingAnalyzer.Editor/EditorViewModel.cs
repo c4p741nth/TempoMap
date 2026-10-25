@@ -294,6 +294,8 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         FollowPlayhead = FollowPlayhead, Speed = SelectedSpeed, SnapDivisor = SnapDivisor, AutoMode = SelectedAutoMode,
         TableTab = TableTab, ShiftBeatDivisor = SelectedShiftBeatStep.Divisor, ShiftMs = SelectedShiftMsStep,
         BpmStep = SelectedBpmStep, AlignToEdge = AlignToEdge, StartOnBar = StartOnBar, Theme = SelectedTheme, AutoNormalizeSv = AutoNormalizeSv, OsuCopyShiftMs = OsuCopyShiftMs, CopyProfiles = copyProfiles.ToArray(),
+        WaveformLayer = WaveformLayer, ShowOnsets = ShowOnsets, ShowSv = ShowSv, ShowKiai = ShowKiai, MeasureView = MeasureView, GhostProposal = GhostProposal,
+        LoopEnabled = LoopEnabled, PreRollBeats = PreRollBeats, ComparisonSpeed = ComparisonSpeed,
     };
     /// <summary>Applies remembered settings through the same setters as the window, so out-of-range values are ignored.</summary>
     public void ApplySettings(EditorSettings s)
@@ -312,6 +314,10 @@ public sealed partial class EditorViewModel : ObservableObject, IDisposable
         SelectedShiftMsStep = s.ShiftMs;
         SelectedBpmStep = s.BpmStep;
         AlignToEdge = s.AlignToEdge; StartOnBar = s.StartOnBar;
+        WaveformLayer = s.WaveformLayer; ShowOnsets = s.ShowOnsets; ShowSv = s.ShowSv; ShowKiai = s.ShowKiai; MeasureView = s.MeasureView; GhostProposal = s.GhostProposal;
+        LoopEnabled = s.LoopEnabled; PreRollBeats = s.PreRollBeats; ComparisonSpeed = s.ComparisonSpeed;
+        // Nothing is open yet at startup: what is "saved" is whatever the remembered choices make an empty timing.
+        if (!HasWorkspace) savedTiming = CaptureTiming();
     }
     public IReadOnlyList<string> Speeds { get; } = ["0.25", "0.5", "0.75", "1.0"];
     public string SelectedSpeed

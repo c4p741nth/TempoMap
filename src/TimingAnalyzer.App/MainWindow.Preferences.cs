@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
+using Avalonia.Media;
 using TimingAnalyzer.Editor;
 
 namespace TimingAnalyzer.App;
@@ -75,32 +76,39 @@ public partial class MainWindow
             case "Mark anchor B": model.MarkAnchorB(); break;
             case "Previous issue": model.ReviewNext(-1); break;
             case "Next issue": model.ReviewNext(); break;
+            case "Shift earlier by beat step": model.ShiftBeatStepCommand.Execute("-1"); break;
+            case "Shift later by beat step": model.ShiftBeatStepCommand.Execute("1"); break;
         }
     }
     private async void ShowPreferences(object? sender, RoutedEventArgs e)
     {
-        var dialog = new Window { Title = "Keyboard shortcuts and copy profiles", Width = 650, Height = 620, MinHeight = 360,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, Icon = Icon, DataContext = model };
-        var keys = ToolPanel(); var fields = new Dictionary<string, TextBox>();
-        Label(keys, "Change a shortcut using names such as Ctrl+P or Alt+R. Leave it empty to disable. Input fields retain their own navigation keys.");
+        var dialog = NewDialog("Keyboard shortcuts and copy profiles", 700, resizable: true, height: 620); dialog.DataContext = model;
+        var fields = new Dictionary<string, TextBox>();
+        var keyRows = new WrapPanel { ItemSpacing = 24, LineSpacing = 6 };
         foreach (var command in EditorShortcuts.Defaults)
         {
-            var row = new Grid { ColumnDefinitions = new("*,160"), ColumnSpacing = 12 };
-            row.Children.Add(new TextBlock { Text = command.Key, VerticalAlignment = VerticalAlignment.Center });
+            var row = new Grid { Width = 300, ColumnDefinitions = new("*,150"), ColumnSpacing = 10 };
+            row.Children.Add(new TextBlock { Text = command.Key, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
             var field = new TextBox { Text = fileSettings.Shortcuts.GetValueOrDefault(command.Key, command.Value) };
-            Grid.SetColumn(field, 1); row.Children.Add(field); keys.Children.Add(row); fields[command.Key] = field;
+            Grid.SetColumn(field, 1); row.Children.Add(field); keyRows.Children.Add(row); fields[command.Key] = field;
         }
-        var copy = ToolPanel(); Label(copy, "Copy compensation in milliseconds. Default osu! profile: -33. Applies to exported clipboard rows only; internal paste and saved files keep their original times.");
-        copy.Children.Add(Bound(new NumericUpDown { Minimum = -10000, Maximum = 10000, Increment = 1 }, NumericUpDown.ValueProperty, nameof(model.OsuCopyShiftMs), true));
-        var profiles = Bound(new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch }, ItemsControl.ItemsSourceProperty, nameof(model.CopyProfiles)); copy.Children.Add(profiles);
-        copy.Children.Add(ActionButton("Use profile", () => { if (profiles.SelectedItem is CopyProfile profile) model.OsuCopyShiftMs = profile.ShiftMs; }));
-        var name = new TextBox { PlaceholderText = "New profile name" }; copy.Children.Add(name);
-        copy.Children.Add(ActionButton("Save current value as profile", () => model.AddCopyProfile(name.Text ?? "")));
+        var keys = new StackPanel { Margin = new Thickness(16), Spacing = 12 };
+        keys.Children.Add(Hint("Change a shortcut using names such as Ctrl+P or Alt+R. Leave it empty to disable. Input fields retain their own navigation keys."));
+        keys.Children.Add(keyRows);
+
+        var amount = Bound(new NumericUpDown { Minimum = -10000, Maximum = 10000, Increment = 1, Width = 130, HorizontalAlignment = HorizontalAlignment.Left }, NumericUpDown.ValueProperty, nameof(model.OsuCopyShiftMs), true);
+        var profiles = Bound(new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, PlaceholderText = "Choose a profile" }, ItemsControl.ItemsSourceProperty, nameof(model.CopyProfiles));
+        var name = new TextBox { PlaceholderText = "New profile name" };
+        var copy = new StackPanel { Margin = new Thickness(16), Spacing = 12 };
+        copy.Children.Add(Card("Clipboard compensation",
+            Hint("Milliseconds added to the rows you copy for osu!. Default osu! profile: -33. Applies to exported clipboard rows only; internal paste and saved files keep their original times."),
+            Row(Caption("Compensation (ms)"), amount)));
+        copy.Children.Add(Card("Profiles",
+            profiles, ActionButton("Use profile", () => { if (profiles.SelectedItem is CopyProfile profile) model.OsuCopyShiftMs = profile.ShiftMs; }),
+            name, ActionButton("Save current value as profile", () => model.AddCopyProfile(name.Text ?? ""))));
         var tabs = new TabControl { ItemsSource = new[] { new TabItem { Header = "Keyboard", Content = new ScrollViewer { Content = keys } }, new TabItem { Header = "Copy profiles", Content = new ScrollViewer { Content = copy } } } };
-        var error = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, Foreground = Avalonia.Media.Brushes.IndianRed };
-        var footer = new StackPanel { Margin = new Thickness(16), Spacing = 8 }; footer.Children.Add(error);
-        var buttons = new WrapPanel { ItemSpacing = 8 };
-        buttons.Children.Add(ActionButton("Save preferences", () =>
+        var error = new TextBlock { TextWrapping = TextWrapping.Wrap, Classes = { "error" } };
+        var save = Primary(ActionButton("Save preferences", () =>
         {
             var parsed = new HashSet<(Key, KeyModifiers)>(); var values = new Dictionary<string, string>();
             try
@@ -120,9 +128,11 @@ public partial class MainWindow
             }
             catch (Exception ex) when (ex is FormatException or ArgumentException) { error.Text = ex.Message; }
         }));
-        buttons.Children.Add(ActionButton("Default keys", () => { foreach (var field in fields) field.Value.Text = EditorShortcuts.Defaults[field.Key]; }));
-        buttons.Children.Add(ActionButton("Close", () => { SaveSettings(); dialog.Close(); }));
-        footer.Children.Add(buttons); var dock = new DockPanel(); DockPanel.SetDock(footer, Dock.Bottom); dock.Children.Add(footer); dock.Children.Add(tabs); dialog.Content = dock;
+        var defaults = ActionButton("Default keys", () => { foreach (var field in fields) field.Value.Text = EditorShortcuts.Defaults[field.Key]; });
+        var close = ActionButton("Close", () => { SaveSettings(); dialog.Close(); });
+        var footer = new StackPanel { Margin = new Thickness(16, 8, 16, 16), Spacing = 8 };
+        footer.Children.Add(error); footer.Children.Add(ButtonRow([save, defaults, close]));
+        var dock = new DockPanel(); DockPanel.SetDock(footer, Dock.Bottom); dock.Children.Add(footer); dock.Children.Add(tabs); dialog.Content = dock;
         CloseOnEscape(dialog); await dialog.ShowDialog(this);
     }
 }

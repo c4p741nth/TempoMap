@@ -8,8 +8,9 @@ public sealed partial class EditorViewModel
     public string? ProjectPath { get; private set; }
     public string? OriginalAudioPath => sourceAudioPath;
     public IReadOnlyList<Bookmark> Bookmarks => bookmarks;
-    public bool IsDirty => savedTiming.AutoNormalizeSv != Edits.AutoNormalizeSv ||
-        !savedTiming.Points.SequenceEqual(Edits.RedLines.Concat(Edits.GreenLines)) || !savedBookmarks.SequenceEqual(bookmarks);
+    /// <summary>Edits not yet saved. With nothing open there is nothing to save, so a fresh window is never dirty.</summary>
+    public bool IsDirty => HasWorkspace && (savedTiming.AutoNormalizeSv != Edits.AutoNormalizeSv ||
+        !savedTiming.Points.SequenceEqual(Edits.RedLines.Concat(Edits.GreenLines)) || !savedBookmarks.SequenceEqual(bookmarks));
     public bool HasWorkspace => AudioPath is not null || BeatmapPath is not null || ProjectPath is not null;
     private TimingState CaptureTiming() => new(Edits.RedLines.Concat(Edits.GreenLines).ToArray(), Edits.AutoNormalizeSv);
 

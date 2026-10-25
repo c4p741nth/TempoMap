@@ -52,6 +52,45 @@ public class SettingsTests
     }
 
     [Fact]
+    public async Task StartingWithRememberedNormalizeSvAsksNothingButEditingAnOpenSongDoes()
+    {
+        // The remembered Auto normalize SV is applied before any file is open: with nothing open there is nothing to save,
+        // so closing must not ask (it did, because the saved baseline was captured with the choice off).
+        var vm = NewModel();
+        vm.ApplySettings(new EditorSettings { AutoNormalizeSv = true });
+        Assert.False(vm.IsDirty);
+        await vm.LoadAsync(Path.GetTempFileName());
+        Assert.False(vm.IsDirty);
+        vm.AutoNormalizeSv = false; // With a song open the choice changes what Save writes, so it still counts as an edit.
+        Assert.True(vm.IsDirty);
+    }
+
+    [Fact]
+    public void ViewListeningAndLayoutChoicesAreRememberedAndBadOnesIgnored()
+    {
+        var vm = NewModel();
+        vm.WaveformLayer = "Spectrogram"; vm.ShowOnsets = true; vm.ShowSv = false; vm.ShowKiai = false; vm.MeasureView = true; vm.GhostProposal = false;
+        vm.LoopEnabled = true; vm.PreRollBeats = 4; vm.ComparisonSpeed = "0.5";
+        string path = Path.Combine(Directory.CreateTempSubdirectory().FullName, "TempoMap", "settings.json");
+        vm.CaptureSettings(new EditorSettings { TablePanelWidth = 420, TimingToolsExpanded = false }).Save(path);
+
+        var loaded = EditorSettings.Load(path);
+        Assert.Equal((420.0, false), (loaded.TablePanelWidth, loaded.TimingToolsExpanded));
+        var other = NewModel();
+        other.ApplySettings(loaded);
+        Assert.Equal(("Spectrogram", true, false, false, true, false), (other.WaveformLayer, other.ShowOnsets, other.ShowSv, other.ShowKiai, other.MeasureView, other.GhostProposal));
+        Assert.Equal((true, 4, "0.5"), (other.LoopEnabled, other.PreRollBeats, other.ComparisonSpeed));
+
+        // A layer or speed the window does not offer is skipped (the earlier choice stays); the pre-roll is clamped like the box clamps it.
+        other.ApplySettings(new EditorSettings { WaveformLayer = "Bogus", ComparisonSpeed = "9.9", PreRollBeats = 99 });
+        Assert.Equal(("Spectrogram", "0.5", 16), (other.WaveformLayer, other.ComparisonSpeed, other.PreRollBeats));
+        // The defaults of a fresh record are what a first run shows.
+        var fresh = new EditorSettings();
+        Assert.Equal(("Full", false, true, true, false, true), (fresh.WaveformLayer, fresh.ShowOnsets, fresh.ShowSv, fresh.ShowKiai, fresh.MeasureView, fresh.GhostProposal));
+        Assert.Equal((350.0, true), (fresh.TablePanelWidth, fresh.TimingToolsExpanded));
+    }
+
+    [Fact]
     public async Task MoveHereMovesTheSelectedLinesSoTheLastPickedLandsOnThePlayhead()
     {
         var vm = NewModel();

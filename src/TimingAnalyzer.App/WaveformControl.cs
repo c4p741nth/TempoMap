@@ -25,9 +25,20 @@ public sealed partial class WaveformControl : Control
     private static readonly Pen RangeEdge = new(new SolidColorBrush(Color.FromArgb(200, 120, 170, 255)));
     private Pen[] gridPens = [new(new SolidColorBrush(Color.Parse("#303741"))),
         new(Brushes.Gray), new(Brushes.MediumPurple), new(Brushes.IndianRed, 2)];
+    private readonly CanvasPalette palette;
+    /// <summary>
+    /// Pixels per unit of amplitude for a strip <paramref name="height"/> tall: the loudest peak of the whole song reaches
+    /// <paramref name="reach"/> × height from the centre. As in the main waveform a quiet song is not stretched, and a loud one
+    /// (peaks above 1) is not drawn out of its strip.
+    /// </summary>
+    internal static double PeakScale(AudioContent audio, double height, double reach)
+    {
+        var full = audio.Peaks.Range(0, audio.Peaks.SampleCount);
+        return height * reach / Math.Max(1, Math.Max(Math.Abs(full.Min), Math.Abs(full.Max)));
+    }
     public WaveformControl()
     {
-        Focusable = true; ClipToBounds = true;
+        Focusable = true; ClipToBounds = true; palette = new(this);
         ActualThemeVariantChanged += (_, _) => UpdatePalette();
         AttachedToVisualTree += (_, _) => UpdatePalette();
         DataContextChanged += (_, _) =>

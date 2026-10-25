@@ -99,17 +99,6 @@ public partial class MainWindow : Window
         });
     }
     private void ApplyTempoFactor(object? sender, RoutedEventArgs e) => model.ApplyTempoFactor();
-    private async void ShowToolGuide(object? sender, RoutedEventArgs e)
-    {
-        var dialog = new Window { Title = "คู่มือเครื่องมือ TempoMap", Width = Math.Min(680, Width - 40),
-            Height = Math.Min(620, Height - 40), WindowStartupLocation = WindowStartupLocation.CenterOwner, Icon = Icon };
-        var close = new Button { Content = "ปิด", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
-        var panel = new DockPanel { Margin = new Thickness(20) };
-        DockPanel.SetDock(close, Dock.Bottom); panel.Children.Add(close);
-        panel.Children.Add(new ScrollViewer { Content = BuildThaiGuide(), Margin = new Thickness(0, 0, 0, 12) });
-        dialog.Content = panel; close.Click += (_, _) => dialog.Close(); CloseOnEscape(dialog);
-        await dialog.ShowDialog(this);
-    }
     private void AddPointForTab(object? sender, RoutedEventArgs e)
     {
         if (model.TableTab == 2) AddInheritedPoint(sender, e);
@@ -193,11 +182,7 @@ public partial class MainWindow : Window
             e.Handled = true;
             dialog.Close(result);
         }, RoutingStrategies.Tunnel);
-    private async void ShowKeys(object? sender, RoutedEventArgs e)
-    {
-        string configured = string.Join("\n", EditorShortcuts.Defaults.Select(c => c.Key + ": " + fileSettings.Shortcuts.GetValueOrDefault(c.Key, c.Value)));
-        await Choose("Keyboard shortcuts", configured + "\n\nFixed navigation: arrows = beat-snap steps (hold to scrub), Ctrl+arrows = move / nudge BPM, Home/End = start/end. Shift+drag = range; middle drag = pan; Ctrl+wheel = zoom. Alt+M held = temporary metronome mute.\n\nSettings → Keyboard shortcuts / copy profiles changes command keys.\n\nColors: red = timing, green = SV, gold = playhead, purple = bar, cyan = proposed grid, blue = range, amber = Kiai / onset strength.", "Close");
-    }
+    private void PlayRangeClicked(object? sender, RoutedEventArgs e) => model.PlayRange();
     private void QueueTableSync()
     {
         if (syncQueued) return;
@@ -254,7 +239,9 @@ public partial class MainWindow : Window
     {
         // Written only when it moves, so the layout pass it causes settles instead of looping.
         static void Set(Control c, double value) { if (Math.Abs(c.MaxHeight - value) > 0.5) c.MaxHeight = value; }
-        VolumeGroup.IsVisible = Bounds.Width >= 1100;
+        bool wide = Bounds.Width >= 1100;
+        VolumeGroup.IsVisible = MetronomeCheckBox.IsVisible = wide;
+        MetronomeToggle.IsVisible = !wide;
         Set(TopScroll, Math.Max(50, MainArea.Bounds.Height - TransportBar.Bounds.Height - TransportBar.Margin.Top - TransportBar.Margin.Bottom - BottomPanel.Bounds.Height - BottomPanel.Margin.Top -
             TopScroll.Margin.Bottom - SeekBar.Bounds.Height - SeekBar.Margin.Top - SeekBar.Margin.Bottom -
             WaveformHeader.Bounds.Height - WaveformHeader.Margin.Top - WaveformHeader.Margin.Bottom - SongOverview.Bounds.Height - SongOverview.Margin.Top - SongOverview.Margin.Bottom - 2 - MinWaveformHeight));
@@ -270,7 +257,13 @@ public partial class MainWindow : Window
         Width = Math.Max(MinWidth, settings.WindowWidth); Height = Math.Max(MinHeight, settings.WindowHeight);
         normalSize = new Size(Width, Height);
         if (settings.WindowMaximized) WindowState = WindowState.Maximized;
+        // Layout: the table panel keeps the width the user dragged it to (never under its minimum nor over 60% of the window).
+        double panel = double.IsFinite(settings.TablePanelWidth) ? settings.TablePanelWidth : new EditorSettings().TablePanelWidth;
+        BodyGrid.ColumnDefinitions[2].Width = new GridLength(Math.Clamp(panel, MinTablePanelWidth, Math.Max(MinTablePanelWidth, settings.WindowWidth * .6)));
+        TimingToolsExpander.IsExpanded = settings.TimingToolsExpanded;
     }
+    /// <summary>The table card's minimum width (330) plus its left margin.</summary>
+    private const double MinTablePanelWidth = 338;
     private void ApplyTheme()
     {
         if (Application.Current is { } app)
@@ -285,9 +278,12 @@ public partial class MainWindow : Window
     {
         try
         {
+            double panel = BodyGrid.ColumnDefinitions[2].ActualWidth;
             model.CaptureSettings(fileSettings with
             {
-                WindowWidth = normalSize.Width, WindowHeight = normalSize.Height, WindowMaximized = WindowState == WindowState.Maximized
+                WindowWidth = normalSize.Width, WindowHeight = normalSize.Height, WindowMaximized = WindowState == WindowState.Maximized,
+                TablePanelWidth = panel >= MinTablePanelWidth ? Math.Round(panel) : fileSettings.TablePanelWidth,
+                TimingToolsExpanded = TimingToolsExpander.IsExpanded
             }).Save(SettingsPath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { /* settings are a convenience */ }
@@ -296,7 +292,7 @@ public partial class MainWindow : Window
     {
         ApplySettings(new EditorSettings());
         SaveSettings();
-        model.ReportError("Settings restored to their defaults (volumes, metronome, follow, speed, beat snap, shift steps, BPM step, auto-time mode and choices, table tab, window size and Dark appearance).");
+        model.ReportError("Settings restored to their defaults (volumes, metronome, follow, speed, beat snap, shift steps, BPM step, auto-time mode and choices, table tab, waveform view, loop and pre-roll, table width, Timing tools open, window size and Dark appearance).");
     }
     private static bool InInputControl(KeyEventArgs e) => (e.Source as Visual)?.GetSelfAndVisualAncestors().Any(v => v is TextBox or ComboBox or Slider or NumericUpDown) == true;
     private static bool InTextBox(KeyEventArgs e) =>
@@ -469,53 +465,6 @@ public partial class MainWindow : Window
     public static string Version => typeof(MainWindow).Assembly
         .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
         .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion ?? "dev";
-    private async void ShowAbout(object? sender, RoutedEventArgs e)
-    {
-        var github = new Button { Content = "Open on GitHub" };
-        var close = new Button { Content = "Close" };
-        var dialog = new Window { Title = "About " + AppInfo.Name, Width = 480, SizeToContent = SizeToContent.Height,
-            CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, Icon = Icon };
-        var panel = new StackPanel { Margin = new Thickness(20), Spacing = 10 };
-        panel.Children.Add(new TextBlock { Text = AppInfo.Name + " v" + Version, FontSize = 20, FontWeight = Avalonia.Media.FontWeight.Bold });
-        panel.Children.Add(new TextBlock { Text = AppInfo.Tagline + ", by " + AppInfo.Author, FontSize = 15 });
-        panel.Children.Add(new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, Text =
-            "Auto-timing for steady, multi-BPM and live-played songs (a red line on every drum hit), bar lines, normalised " +
-            "slider velocity for osu!mania. It started as a rebuild of the TimingAnlyz 0.32.4 BPM/offset detector." });
-        panel.Children.Add(new TextBlock { Text = AppInfo.Repository, Opacity = 0.8 });
-        panel.Children.Add(new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, Opacity = 0.7, FontSize = 12, Text =
-            "Audio: BASS by un4seen (free for non-commercial use) through ManagedBass. UI: Avalonia. MVVM: CommunityToolkit.Mvvm." });
-        var buttons = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 12 };
-        buttons.Children.Add(github); buttons.Children.Add(close);
-        panel.Children.Add(buttons); dialog.Content = panel;
-        github.Click += async (_, _) =>
-        {
-            try { await dialog.Launcher.LaunchUriAsync(new Uri(AppInfo.Repository)); }
-            catch (Exception ex) { model.ReportError(ex.Message); }
-        };
-        close.Click += (_, _) => dialog.Close();
-        CloseOnEscape(dialog);
-        await dialog.ShowDialog(this);
-    }
-    private async Task<bool> Confirm(string title, string message)
-    {
-        var yes = new Button { Content = "Replace red lines" };
-        var no = new Button { Content = "Cancel" };
-        var dialog = new Window { Title = title, Width = 520, SizeToContent = SizeToContent.Height,
-            CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, Icon = Icon };
-        var buttons = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 12 };
-        buttons.Children.Add(yes); buttons.Children.Add(no);
-        var panel = new StackPanel { Margin = new Thickness(20), Spacing = 16 };
-        // A long message scrolls; the buttons below it stay on screen.
-        panel.Children.Add(new ScrollViewer
-        {
-            MaxHeight = 360, VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-            Content = new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap }
-        });
-        panel.Children.Add(buttons); dialog.Content = panel;
-        yes.Click += (_, _) => dialog.Close(true); no.Click += (_, _) => dialog.Close(false);
-        CloseOnEscape(dialog, false); // Esc is Cancel
-        return await dialog.ShowDialog<bool>(this);
-    }
     private async void CopyTiming(object? sender, RoutedEventArgs e)
     {
         try
