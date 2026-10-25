@@ -8,8 +8,8 @@ A timing editor for osu! with BPM/offset detection, a waveform and editable red/
 2. Open a song or `.osu` file, then use **Auto-time** to propose timing. Type a BPM to keep it fixed and fit only the offset.
 3. Review the grid, click **Apply**, and copy the timing points into osu! or save the `.osu` file.
 
-Release builds include .NET. Audio import also needs `ffmpeg` and `ffprobe` on PATH or beside the app;
-original audio files are preserved. Review [audio import and clipboard behavior](docs/AUDIO-IMPORT.md) before pasting timing into osu!.
+Release builds include .NET and open supported original audio directly. Optional Ogg conversion needs `ffmpeg`
+on PATH or beside the app; original audio files are preserved. Review [audio import and clipboard behavior](docs/AUDIO-IMPORT.md) before pasting timing into osu!.
 
 ## Features
 
@@ -17,6 +17,9 @@ original audio files are preserved. Review [audio import and clipboard behavior]
 - Edit timing points with keyboard shortcuts, waveform navigation and a metronome.
 - Add SV and Kiai points; keep manual SV values or enable automatic BPM compensation.
 - Adjust BPM with repeatable multipliers, fit offsets and fill tempo ramps.
+- Preview proposed grids, loop ranges with pre-roll, tap tempo and time from A/B anchors.
+- Inspect filters, onsets, spectrograms, SV/Kiai lanes, bookmarks and a song overview.
+- Save projects with recovery, customize shortcuts/copy profiles, and export `.osz` with audio.
 - Switch between light, dark and system themes.
 
 ## Documentation

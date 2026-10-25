@@ -5,16 +5,28 @@ public sealed record TimingState(TimingPoint[] Points, bool AutoNormalizeSv);
 
 public sealed class UndoStack
 {
-    private readonly Stack<(TimingState Before, TimingState After)> undo = new(), redo = new();
+    private readonly Stack<(TimingState Before, TimingState After, string Label)> undo = new(), redo = new();
     public bool CanUndo => undo.Count > 0;
     public bool CanRedo => redo.Count > 0;
+    public string UndoLabel => undo.TryPeek(out var edit) ? edit.Label : "";
+    public string RedoLabel => redo.TryPeek(out var edit) ? edit.Label : "";
+    private static string Describe(TimingState before, TimingState after)
+    {
+        if (before.AutoNormalizeSv != after.AutoNormalizeSv) return after.AutoNormalizeSv ? "enable Auto normalize SV" : "use manual SV";
+        int delta = after.Points.Length - before.Points.Length;
+        if (delta != 0) return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{(delta > 0 ? "add" : "delete")} {Math.Abs(delta)} timing points");
+        if (before.Points.Zip(after.Points).Any(p => p.First.Effects != p.Second.Effects)) return "change Kiai / effects";
+        if (before.Points.Zip(after.Points).Any(p => p.First.BeatLength != p.Second.BeatLength)) return "change BPM / SV";
+        if (before.Points.Zip(after.Points).Any(p => p.First.Time != p.Second.Time)) return "move timing points";
+        return "edit timing points";
+    }
     /// <summary>Changes whenever a step is recorded, undone or redone (not when one is extended), so a caller can tell that
     /// nothing else was edited since the step it extends.</summary>
     public int Version { get; private set; }
     private static TimingState Copy(TimingState state) => state with { Points = state.Points.ToArray() };
     public void Record(TimingState before, TimingState after)
     {
-        undo.Push((Copy(before), Copy(after)));
+        undo.Push((Copy(before), Copy(after), Describe(before, after)));
         redo.Clear();
         Version++;
     }
@@ -22,7 +34,7 @@ public sealed class UndoStack
     public void ExtendLast(TimingState after)
     {
         var last = undo.Pop();
-        undo.Push((last.Before, Copy(after)));
+        undo.Push((last.Before, Copy(after), last.Label));
         redo.Clear();
     }
     public TimingState Undo() { var edit = undo.Pop(); redo.Push(edit); Version++; return Copy(edit.Before); }

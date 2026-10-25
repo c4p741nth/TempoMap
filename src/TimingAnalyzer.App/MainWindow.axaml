@@ -22,7 +22,7 @@
       <Setter Property="ItemSpacing" Value="6" /><Setter Property="LineSpacing" Value="6" />
     </Style>
     <Style Selector="WrapPanel.groups">
-      <Setter Property="ItemSpacing" Value="20" />
+      <Setter Property="ItemSpacing" Value="12" />
     </Style>
     <Style Selector="WrapPanel.toolbar TextBlock, WrapPanel.toolbar ComboBox, WrapPanel.toolbar Button, WrapPanel.toolbar RepeatButton, WrapPanel.toolbar TextBox, WrapPanel.toolbar CheckBox, WrapPanel.toolbar Slider">
       <Setter Property="VerticalAlignment" Value="Center" />
@@ -67,6 +67,17 @@
         <MenuItem Header="_Open .osu..." Click="OpenOsu" InputGesture="Ctrl+O" />
         <MenuItem Header="Open _audio..." Click="OpenAudio" InputGesture="Ctrl+Shift+O" />
         <MenuItem Header="_Save .osu" Click="SaveOsu" InputGesture="Ctrl+S" />
+        <MenuItem Header="Save .osu _as..." Click="SaveOsuAs" />
+        <Separator />
+        <MenuItem Header="Open _project..." Click="OpenProject" />
+        <MenuItem Header="Save project" Click="SaveProject" />
+        <MenuItem Header="Save project as..." Click="SaveProjectAs" />
+        <MenuItem x:Name="RecentMenu" Header="Recent files" />
+        <Separator />
+        <MenuItem Header="Export .osz with audio…" Click="ExportArchive" />
+        <MenuItem Header="Convert audio to Ogg…" Click="ConvertToOgg" />
+        <MenuItem Header="Audio diagnostics…" Click="AudioDiagnostics" />
+        <MenuItem Header="Revert to saved..." Click="RevertFile" />
         <Separator />
         <MenuItem Header="Copy _all timing points" Click="CopyTiming" InputGesture="Ctrl+Shift+C"
                   ToolTip.Tip="All red and green lines for osu! with -33 ms compensation. Pasting within TempoMap keeps original times." />
@@ -74,8 +85,8 @@
         <MenuItem Header="E_xit" Click="ExitApp" InputGesture="Alt+F4" />
       </MenuItem>
       <MenuItem Header="_Edit">
-        <MenuItem Header="_Undo" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
-        <MenuItem Header="_Redo" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
+        <MenuItem Header="{Binding UndoLabel}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" />
+        <MenuItem Header="{Binding RedoLabel}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" />
         <Separator />
         <MenuItem Header="_Add timing point here" Click="AddTimingPoint" InputGesture="Ctrl+P"
                   ToolTip.Tip="A new red line at the playhead (yellow line), with the settings of the line before it." />
@@ -99,6 +110,7 @@
                   ToolTip.Tip="Re-time the highlighted range (Shift+drag on the waveform, or Shift+←/→): its red lines are replaced by what the analysis finds there, a tempo change inside gets its own line, and the timing after the range stays. One undo step." />
         <MenuItem Header="Clear range" Command="{Binding ClearRangeCommand}" />
         <Separator />
+        <MenuItem Header="Shift / nudge selected">
         <MenuItem Header="Shift selected −1 ms" Command="{Binding ShiftMsCommand}" CommandParameter="-1" InputGesture="Ctrl+Left" />
         <MenuItem Header="Shift selected +1 ms" Command="{Binding ShiftMsCommand}" CommandParameter="1" InputGesture="Ctrl+Right" />
         <MenuItem Header="Shift selected −5 ms" Command="{Binding ShiftMsCommand}" CommandParameter="-5" InputGesture="Ctrl+Shift+Left" />
@@ -107,6 +119,8 @@
                   ToolTip.Tip="Raise the BPM of the selected red lines to the next multiple of the step in the Shift row (their times stay). A run of nudges is one undo step." />
         <MenuItem Header="Tune BPM of selected down one step" Command="{Binding NudgeBpmCommand}" CommandParameter="-1" InputGesture="Ctrl+Down" />
         <Separator />
+        </MenuItem>
+        <MenuItem Header="Section / range tools">
         <MenuItem Header="_Bar line here" Command="{Binding StartBarHereCommand}" />
         <MenuItem Header="Auto-time _section" Click="AutoTimeSection" />
         <MenuItem Header="_Fit offset" Click="FitOffset" />
@@ -114,6 +128,7 @@
         <MenuItem Header="BPM from s_pacing" Command="{Binding BpmFromSpacingCommand}" />
         <MenuItem Header="Fill _ramp" Command="{Binding FillRampCommand}" InputGesture="Ctrl+L" />
         <Separator />
+        </MenuItem>
         <MenuItem Header="Tempo of selected lines">
           <MenuItem Header="_Multiply BPM..." Click="FocusTempoFactor" />
           <Separator />
@@ -128,19 +143,17 @@
                   ToolTip.Tip="Mark the sections whose grid the onsets do not support: worth a listen. Selected in the table and marked on the waveform." />
       </MenuItem>
       <MenuItem Header="_Settings">
-        <MenuItem Header="Auto normalize _SV" ToggleType="CheckBox" IsChecked="{Binding AutoNormalizeSv, Mode=TwoWay}"
-                  ToolTip.Tip="Off: preserve green SV numbers when red lines change. On: keep current SV as a baseline and follow BPM changes. Switching modes is undoable." />
-        <Separator />
-        <MenuItem Header="_Metronome" ToggleType="CheckBox" IsChecked="{Binding ClickEnabled, Mode=TwoWay}" InputGesture="M" />
-        <MenuItem Header="_Follow playhead" ToggleType="CheckBox" IsChecked="{Binding FollowPlayhead, Mode=TwoWay}" InputGesture="F" />
-        <Separator />
         <MenuItem Header="Auto-time on the waveform's _edge" ToggleType="CheckBox" IsChecked="{Binding AlignToEdge, Mode=TwoWay}"
                   ToolTip.Tip="Auto-time, Auto-time range, Fit offset and Snap to onsets put each red line on the leading edge of the hit in the waveform, about 18 ms after the onset peak the original detector reports (the detector's offset needed +1/16 or +1/32 of a beat by hand on sharp drums). Off: the detector's own convention, which is where ranked maps by other mappers sit (13.6 ms before the edge on average)." />
         <MenuItem Header="Auto-time starts on a _bar line" ToggleType="CheckBox" IsChecked="{Binding StartOnBar, Mode=TwoWay}"
                   ToolTip.Tip="Auto-time moves the first red line by whole beats onto the first beat of a bar that has music, as the beat model's bar starts say (it found the right bar phase on 133 of 143 held-out maps). Off: the detector's first beat after 35 ms, which can be any beat of the bar." />
         <Separator />
+        <MenuItem Header="Keyboard shortcuts / copy profiles…" Click="ShowPreferences" />
         <MenuItem Header="_Restore default settings" Click="RestoreDefaults"
                   ToolTip.Tip="Volumes, metronome, follow, speed, beat snap, auto-time mode, table tab and window size back to their defaults. Settings are saved when the editor closes." />
+      </MenuItem>
+      <MenuItem Header="_Workspace">
+        <MenuItem Header="Listening / display / review…" Click="ShowWorkspaceTools" InputGesture="F3" />
       </MenuItem>
       <MenuItem Header="_Help">
         <MenuItem Header="คู่มือเครื่องมือ (ไทย)" Click="ShowToolGuide" InputGesture="F2" />
@@ -155,9 +168,10 @@
         </StackPanel>
       </Grid>
     </Border>
-    <DockPanel Margin="16,12,16,12">
+    <Grid Margin="12,8,12,8" ColumnDefinitions="*,6,350">
+      <GridSplitter Grid.Column="1" ResizeDirection="Columns" Background="{DynamicResource WorkspaceEdge}" HorizontalAlignment="Stretch" Margin="2,0" AutomationProperties.Name="Resize timing table" />
       <!-- Docked first, so the timing table spans the full window height instead of the space below the toolbars. -->
-      <Border x:Name="TimingCard" Classes="surface" DockPanel.Dock="Right" Width="382" Padding="12" Margin="14,0,0,0">
+      <Border x:Name="TimingCard" Classes="surface" Grid.Column="2" MinWidth="330" Padding="10" Margin="8,0,0,0">
         <!-- The details scroll on a short window (MainWindow.FitPanels) so the table keeps at least MinListHeight. -->
         <Grid x:Name="RightPanel" RowDefinitions="Auto,Auto,*,Auto" IsEnabled="{Binding CanInteract}">
           <StackPanel x:Name="RedLinesTitle" Grid.Row="0" Margin="0,0,0,4" Spacing="6">
@@ -171,17 +185,17 @@
                       ToolTip.Tip="All: red and green lines. Timing: red timing points. Inherited: green points (SV, volume, kiai). Click to select; double-click to seek. Ctrl+click adds a row, Shift+click selects a range. Ctrl+A selects all, Ctrl+C copies. + adds the tab's point type; Ctrl+G adds green from any tab." />
             </DockPanel>
           </StackPanel>
-          <Grid x:Name="TableHeader" Grid.Row="1" Classes="tableHeader" ColumnDefinitions="14,76,60,52,46,40,22" Margin="4,4,4,4" Height="20" VerticalAlignment="Center" Opacity="0.75">
+          <Grid x:Name="TableHeader" Grid.Row="1" Classes="tableHeader" ColumnDefinitions="14,76,60,44,42,32,22" Margin="4,4,4,4" Height="20" VerticalAlignment="Center" Opacity="0.75">
             <TextBlock Grid.Column="1" Text="Offset" /><TextBlock Grid.Column="2" Text="BPM / SV" />
             <TextBlock Grid.Column="3" Text="Meter" ToolTip.Tip="Beats per bar; nb = no bar line (osu!'s omit first barline)." />
-            <TextBlock Grid.Column="4" Text="Sample" /><TextBlock Grid.Column="5" Text="Vol." /><TextBlock Grid.Column="6" Text="Ki" />
+            <TextBlock Grid.Column="4" Text="Sample" ToolTip.Tip="N/S/D = Normal/Soft/Drum sample set; C is custom sample index (0 = default)." /><TextBlock Grid.Column="5" Text="Vol." /><TextBlock Grid.Column="6" Text="Ki" ToolTip.Tip="Kiai: on from this point until an effects change." />
           </Grid>
           <ListBox x:Name="TimingTable" Grid.Row="2" Classes="timing" Focusable="True" SelectionMode="Multiple" ItemsSource="{Binding TableRows}"
                    SelectionChanged="TableSelectionChanged" DoubleTapped="TableDoubleTapped">
             <!-- No tooltip on the table itself: a tooltip popup over the rows took the clicks meant for them. -->
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="e:TimingRow">
-                <Grid ColumnDefinitions="14,76,60,52,46,40,22">
+                <Grid ColumnDefinitions="14,76,60,44,42,32,22">
                   <TextBlock Text="{Binding Marker}" Classes="pointMarker" Classes.green="{Binding IsGreen}" Classes.overlap="{Binding Overlaps}" />
                   <TextBlock Grid.Column="1" Text="{Binding Offset}" FontFamily="Consolas,monospace" />
                   <TextBlock Grid.Column="2" Text="{Binding Value}" />
@@ -220,6 +234,7 @@
               </WrapPanel>
               </StackPanel>
               </Border>
+              <Expander Header="Timing tools" IsExpanded="False" HorizontalAlignment="Stretch"><StackPanel Spacing="6">
               <TextBlock Text="Detection" Classes="section" />
               <DockPanel>
                 <Button DockPanel.Dock="Right" Classes="icon" Content="×" Command="{Binding ClearRangeCommand}" IsVisible="{Binding HasRange}" Margin="6,0,0,0"
@@ -256,19 +271,17 @@
               <TextBlock Text="Bar lines" Classes="section" />
               <Button Content="Bar line here" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Command="{Binding StartBarHereCommand}"
                       ToolTip.Tip="For a red line on every beat: put a bar line on the selected red line and count bars of its meter from there; every later red line that is not on a bar start gets osu!'s &quot;omit first barline&quot;. Lines before it stay as they are. One undo step." />
+              </StackPanel></Expander>
             </StackPanel>
           </ScrollViewer>
         </Grid>
       </Border>
       <!-- Toolbars / waveform / status. On a short window the toolbars scroll (MainWindow.FitPanels) instead of pushing
            the waveform below MinWaveformHeight: at 900x500 they were 738 px tall and cut off the apply row. -->
-      <Grid x:Name="MainArea" RowDefinitions="Auto,*,Auto">
-        <ScrollViewer x:Name="TopScroll" Grid.Row="0" Margin="0,0,0,10"
-                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <StackPanel Spacing="8">
-            <!-- Playback: groups wrap whole (a rule never starts a line); volume values are in the sliders' tooltips. -->
-            <Border Classes="toolGroup">
-            <WrapPanel Classes="toolbar groups" IsEnabled="{Binding CanInteract}">
+      <Grid x:Name="MainArea" RowDefinitions="Auto,Auto,*,Auto">
+            <Border x:Name="TransportBar" Grid.Row="0" Classes="toolGroup" Margin="0,0,0,6">
+            <StackPanel Spacing="6">
+            <WrapPanel Classes="toolbar groups">
               <StackPanel Classes="group">
                 <Button x:Name="PlayButton" Classes="primary" Content="Play / Pause" Command="{Binding TogglePlayCommand}" ToolTip.Tip="Space" />
                 <CheckBox Content="Follow" IsChecked="{Binding FollowPlayhead, Mode=TwoWay}"
@@ -281,90 +294,61 @@
                 <TextBlock Text="Speed" Margin="6,0,0,0" />
                 <ComboBox x:Name="SpeedCombo" Width="76" ItemsSource="{Binding Speeds}" SelectedItem="{Binding SelectedSpeed, Mode=TwoWay}" />
               </StackPanel>
-              <StackPanel Classes="group">
+              <StackPanel x:Name="VolumeGroup" Classes="group">
                 <CheckBox Content="Metronome" IsChecked="{Binding ClickEnabled, Mode=TwoWay}" ToolTip.Tip="M" />
-                <Slider x:Name="MetronomeVolumeSlider" Width="72" Minimum="0" Maximum="100" Value="{Binding ClickVolumePercent, Mode=TwoWay}" ToolTip.Tip="{Binding ClickVolumeLabel}" />
-                <TextBlock x:Name="MetronomePercentLabel" Width="42" Text="{Binding ClickVolumeLabel}" TextAlignment="Right" />
+                <Slider x:Name="MetronomeVolumeSlider" AutomationProperties.Name="Metronome volume" Width="60" Minimum="0" Maximum="100" Value="{Binding ClickVolumePercent, Mode=TwoWay}" ToolTip.Tip="{Binding ClickVolumeLabel}" />
+                <TextBlock x:Name="MetronomePercentLabel" Width="36" Text="{Binding ClickVolumeLabel}" TextAlignment="Right" />
                 <TextBlock Text="Music" Margin="6,0,0,0" />
-                <Slider x:Name="MusicVolumeSlider" Width="72" Minimum="0" Maximum="100" Value="{Binding MusicVolumePercent, Mode=TwoWay}" ToolTip.Tip="{Binding MusicVolumeLabel}" />
-                <TextBlock x:Name="MusicPercentLabel" Width="42" Text="{Binding MusicVolumeLabel}" TextAlignment="Right" />
+                <Slider x:Name="MusicVolumeSlider" AutomationProperties.Name="Music volume" Width="60" Minimum="0" Maximum="100" Value="{Binding MusicVolumePercent, Mode=TwoWay}" ToolTip.Tip="{Binding MusicVolumeLabel}" />
+                <TextBlock x:Name="MusicPercentLabel" Width="36" Text="{Binding MusicVolumeLabel}" TextAlignment="Right" />
               </StackPanel>
             </WrapPanel>
+              <Grid ColumnDefinitions="*,8,Auto" IsVisible="{Binding IsBusy}">
+                <StackPanel Spacing="3">
+                  <TextBlock Text="{Binding AnalysisStage}" FontSize="11" />
+                  <ProgressBar Height="4" Minimum="0" Maximum="100" Value="{Binding AnalysisPercent}" IsIndeterminate="{Binding AnalysisIndeterminate}" />
+                </StackPanel>
+                <Button x:Name="CancelAnalysisButton" Grid.Column="2" Content="Cancel" Click="CancelAnalysis" />
+              </Grid>
+            </StackPanel>
             </Border>
+        <ScrollViewer x:Name="TopScroll" Grid.Row="1" Margin="0,0,0,6"
+                      HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="8">
             <!-- Auto-time: one button, its mode, the optional locked BPM; then the proposal waiting to be applied. -->
             <Border Classes="toolGroup">
             <WrapPanel Classes="toolbar" IsEnabled="{Binding CanInteract}">
               <Button x:Name="AutoTimeButton" Classes="primary" Content="Auto-time" Click="AutoTime"
                       ToolTip.Tip="Ctrl+T. Analyze the whole song and propose red lines; nothing changes until Apply. Normal: one red line for a steady song (offset editable), a red line per tempo change otherwise. Drift: a red line every N beats on a grid that follows a drifting tempo; 1 beat puts one on every drum hit (drums played live). With a BPM in the box: one red line at that BPM." />
-              <ComboBox Width="132" ItemsSource="{Binding AutoModes}" SelectedItem="{Binding SelectedAutoMode, Mode=TwoWay}"
+              <ComboBox Width="104" ItemsSource="{Binding AutoModes}" SelectedItem="{Binding SelectedAutoMode, Mode=TwoWay}"
                         ToolTip.Tip="Normal suits almost every song (it uses the beat model's red lines by itself where it is sure they are better). Beat model: the model's red lines for the whole song, for hard songs Normal keeps on the analyzer (Camellia - Parallel Universe Shifter); listen to the result. Drift is for a tempo that drifts or drums played live (Billie Jean): fewer beats per red line follow the drums more closely; 1 beat = a red line on every drum hit. Drift lines on a steady song are worse than one red line." />
-                <StackPanel x:Name="ApplyRow" Classes="group" Margin="8,0,0,0">
+                <StackPanel x:Name="ApplyRow" Classes="group">
                   <TextBlock Text="BPM" />
-                  <TextBox x:Name="AnalysisBpmBox" Width="72" PlaceholderText="auto" Text="{Binding AnalysisBpmText, Mode=TwoWay}" ToolTip.Tip="A BPM you type stays locked: Auto-time fits only the offset, including when you edit a previous result. Clear the box to detect BPM automatically." />
+                  <TextBox x:Name="AnalysisBpmBox" Width="64" PlaceholderText="auto" Text="{Binding AnalysisBpmText, Mode=TwoWay}" ToolTip.Tip="A BPM you type stays locked: Auto-time fits only the offset, including when you edit a previous result. Clear the box to detect BPM automatically." />
                   <TextBlock Text="Offset" />
-                  <TextBox x:Name="ProposalOffsetBox" Width="80" Text="{Binding ProposalOffsetText, Mode=TwoWay}" IsEnabled="{Binding HasSingleProposal}" ToolTip.Tip="Proposed offset in milliseconds." />
+                  <TextBox x:Name="ProposalOffsetBox" Width="72" Text="{Binding ProposalOffsetText, Mode=TwoWay}" IsEnabled="{Binding HasSingleProposal}" ToolTip.Tip="Proposed offset in milliseconds." />
                   <Button x:Name="ApplyProposalButton" Classes="primary" Content="Apply" Click="ApplyAutoTime" IsEnabled="{Binding HasProposal}"
                           ToolTip.Tip="Ctrl+Enter. Replace all red lines with the proposal (asks first). One undo step; green lines stay." />
                 </StackPanel>
             </WrapPanel>
             </Border>
-            <TextBlock x:Name="NormalizationNote" Text="{Binding NormalizationLabel}" Classes="caption" Margin="4,0" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding NormalizationLabel}" />
-            <!-- Shift the selected red lines (pick them in the timing table; Ctrl+A for all): ❮ step ❯ with the step
-                 picked in between, one for beats and one for ms, instead of a button per amount. -->
-            <Border Classes="toolGroup">
-            <WrapPanel Classes="toolbar" IsEnabled="{Binding CanInteract}"
-                       ToolTip.Tip="Shift the selected red lines (pick them in the timing table, Ctrl+A for all) one step earlier (❮) or later (❯); Ctrl+←/→ shifts 1 ms, Ctrl+Shift+←/→ 5 ms; the last pair tunes their BPM (Ctrl+↑/↓). Green lines stay fixed. A shift that would cross or reach an unselected red line is rejected. Each shift is one undo step; moved lines snap to whole ms.">
-              <TextBlock Classes="group" Text="Shift" />
-              <StackPanel Classes="group" Margin="4,0,0,0">
-                <Button Classes="icon" Content="❮" Command="{Binding ShiftBeatStepCommand}" CommandParameter="-1"
-                        ToolTip.Tip="Earlier by the chosen part of each red line's own beat. One undo step." />
-                <ComboBox x:Name="ShiftBeatCombo" Width="76" ItemsSource="{Binding ShiftBeatSteps}" SelectedItem="{Binding SelectedShiftBeatStep, Mode=TwoWay}"
-                          ToolTip.Tip="Beat step: 1/1 is a whole beat, down to 1/64 of a beat" />
-                <Button x:Name="ShiftBeatLater" Classes="icon" Content="❯" Command="{Binding ShiftBeatStepCommand}" CommandParameter="1"
-                        ToolTip.Tip="Later by the chosen part of each red line's own beat. One undo step." />
-                <TextBlock Text="beat" Opacity="0.7" />
-              </StackPanel>
-              <StackPanel Classes="group gap">
-                <Button Classes="icon" Content="❮" Command="{Binding ShiftMsStepCommand}" CommandParameter="-1"
-                        ToolTip.Tip="Earlier by the chosen ms. One undo step." />
-                <ComboBox Width="64" ItemsSource="{Binding ShiftMsSteps}" SelectedItem="{Binding SelectedShiftMsStep, Mode=TwoWay}"
-                          ToolTip.Tip="Millisecond step" />
-                <Button Classes="icon" Content="❯" Command="{Binding ShiftMsStepCommand}" CommandParameter="1"
-                        ToolTip.Tip="Later by the chosen ms. One undo step." />
-                <TextBlock Text="ms" Opacity="0.7" />
-              </StackPanel>
-              <!-- Tune the BPM of the selected red lines against the waveform: hold ❮ or ❯ to keep going; Ctrl+↑/↓ does the same
-                   from the keyboard (Ctrl+Shift: ten steps). A run is one undo step. -->
-              <StackPanel Classes="group gap">
-                <RepeatButton Classes="icon" Content="❮" Command="{Binding NudgeBpmCommand}" CommandParameter="-1" Delay="400" Interval="90"
-                              ToolTip.Tip="BPM lower by the chosen step (Ctrl+↓). Hold to keep going. The red line's time stays, so tune where the grid and the waveform part ways further on. One undo step per run." />
-                <ComboBox Width="86" ItemsSource="{Binding BpmSteps}" SelectedItem="{Binding SelectedBpmStep, Mode=TwoWay}"
-                          ToolTip.Tip="BPM step. osu! keeps three decimals, so 0.001 is the finest; 0.01 moves the end of a one-minute section by about 4 ms at 143 BPM." />
-                <RepeatButton Classes="icon" Content="❯" Command="{Binding NudgeBpmCommand}" CommandParameter="1" Delay="400" Interval="90"
-                              ToolTip.Tip="BPM higher by the chosen step (Ctrl+↑). Hold to keep going. The red line's time stays. One undo step per run." />
-                <TextBlock Text="BPM" Opacity="0.7" />
-              </StackPanel>
-            </WrapPanel>
-            </Border>
           </StackPanel>
         </ScrollViewer>
-        <Border x:Name="BottomPanel" Grid.Row="2" Classes="surface" Padding="12,8" Margin="0,10,0,0">
-        <StackPanel Spacing="4">
-          <TextBlock Text="{Binding PositionLabel}" FontSize="19" FontFamily="Consolas,monospace" FontWeight="SemiBold" Foreground="{DynamicResource WorkspaceAccent}"
-                     ToolTip.Tip="Position / song length as in the osu! editor (mm:ss:ms): 00:01:531 is offset 1531." />
-          <!-- At most four lines (a long summary would squeeze the waveform); the whole text is in the tooltip. -->
-          <TextBlock Text="{Binding Status}" TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Status}" />
-          <TextBlock Text="Space: play · ←/→: beat snap step (hold: run on) · Shift+←/→ or Shift+drag: range · Ctrl+←/→: shift 1 ms · Ctrl+↑/↓: BPM · F1: all keys"
-                     Foreground="{DynamicResource WorkspaceMuted}" FontSize="11" TextTrimming="CharacterEllipsis" />
-        </StackPanel>
+        <Border x:Name="BottomPanel" Grid.Row="3" Classes="surface" Padding="10,6" Margin="0,6,0,0">
+          <Grid ColumnDefinitions="Auto,12,*">
+            <TextBlock Text="{Binding PositionLabel}" FontSize="15" FontFamily="Consolas,monospace" FontWeight="SemiBold" Foreground="{DynamicResource WorkspaceAccent}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="{Binding Status}" MaxLines="1" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Status}" VerticalAlignment="Center" />
+          </Grid>
         </Border>
-        <Border x:Name="WaveformCard" Grid.Row="1" Background="{DynamicResource WaveformBackgroundBrush}" BorderBrush="{DynamicResource WorkspaceEdge}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+        <Border x:Name="WaveformCard" Grid.Row="2" Background="{DynamicResource WaveformBackgroundBrush}" BorderBrush="{DynamicResource WorkspaceEdge}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
         <DockPanel>
-          <Grid x:Name="WaveformHeader" DockPanel.Dock="Top" ColumnDefinitions="Auto,*" Margin="12,8,12,6">
+          <Grid x:Name="WaveformHeader" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="12,8,12,6">
             <TextBlock Text="WAVEFORM" Classes="caption" VerticalAlignment="Center" />
+            <Button x:Name="ReviewProposalButton" Grid.Column="2" Content="Review…" Click="ShowProposalReview" IsVisible="{Binding HasProposal}" MinHeight="20" Height="22" Padding="6,0" FontSize="11" />
             <TextBlock Grid.Column="1" Text="{Binding SongTitle}" Margin="12,0,0,0" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SongTitle}" />
           </Grid>
-          <Grid x:Name="SeekBar" DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto" Margin="8,6" IsEnabled="{Binding CanInteract}">
+          <local:OverviewControl x:Name="SongOverview" DockPanel.Dock="Bottom" Height="20" Margin="8,0" AutomationProperties.Name="Song overview; click or drag to seek" />
+          <Grid x:Name="SeekBar" DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto" Margin="8,6">
             <Button x:Name="JumpStartButton" Classes="icon" Command="{Binding JumpToStartCommand}" ToolTip.Tip="Go to song start (Home)" AutomationProperties.Name="Go to song start">
               <Path Data="M1,1 L3,1 L3,15 L1,15 Z M14,1 L14,15 L5,8 Z" Fill="{Binding $parent[Button].Foreground}" Width="14" Height="16" />
             </Button>
@@ -374,16 +358,18 @@
             </Button>
           </Grid>
           <Grid>
-            <local:WaveformControl x:Name="Waveform" IsEnabled="{Binding CanInteract}" />
-            <StackPanel x:Name="EmptyState" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasAudio}" IsHitTestVisible="False">
+            <local:WaveformControl x:Name="Waveform" IsEnabled="{Binding CanInteract}" IsVisible="{Binding !MeasureView}" />
+            <local:MeasureViewControl x:Name="MeasureView" IsVisible="{Binding MeasureView}" AutomationProperties.Name="Four rows of four measures; click to seek" />
+            <StackPanel x:Name="EmptyState" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasAudio}">
               <Path Data="M2,14 L2,26 M10,6 L10,34 M18,11 L18,29 M26,1 L26,39 M34,8 L34,32 M42,14 L42,26" Stroke="{DynamicResource WorkspaceAccent}" StrokeThickness="3" StrokeLineCap="Round" Width="44" Height="40" HorizontalAlignment="Center" Opacity="0.8" />
-              <TextBlock Text="Open audio to see the waveform" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" />
+              <Button x:Name="EmptyOpenAudio" Content="Open audio…" Click="OpenAudio" HorizontalAlignment="Center" />
+              <TextBlock Text="1 Open audio · 2 Auto-time / edit · 3 Review and save" FontSize="12" HorizontalAlignment="Center" />
               <TextBlock Text="Ctrl+Shift+O or drop a song / .osu file here" Foreground="{DynamicResource WorkspaceMuted}" HorizontalAlignment="Center" />
             </StackPanel>
           </Grid>
         </DockPanel>
         </Border>
       </Grid>
-    </DockPanel>
+    </Grid>
   </DockPanel>
 </Window>

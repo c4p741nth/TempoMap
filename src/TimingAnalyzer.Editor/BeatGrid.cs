@@ -17,7 +17,7 @@ public static class BeatGrid
         .GroupBy(p => p.Time).Select(g => g.First()).ToArray();
 
     /// <summary>Half-open range [start, end); a new red line truncates the previous section.</summary>
-    public static IEnumerable<GridLine> Query(IReadOnlyList<TimingPoint> reds, double start, double end, int division = 1)
+    public static IEnumerable<GridLine> Query(IReadOnlyList<TimingPoint> reds, double start, double end, int division = 1, double minimumBeatLength = 0)
     {
         if (!double.IsFinite(start) || !double.IsFinite(end) || division is < 1 or > 16)
             throw new ArgumentOutOfRangeException(nameof(start));
@@ -25,6 +25,12 @@ public static class BeatGrid
         {
             var p = reds[i];
             if (i > 0 && reds[i - 1].Time == p.Time) continue;
+            // Gimmick timing remains editable/exportable. Bound work even for vanishingly small beat lengths.
+            if (p.BeatLength < minimumBeatLength || (end - Math.Max(start, p.Time)) / (p.BeatLength / division) > 100000)
+            {
+                if (p.Time >= start && p.Time < end) yield return new(p.Time, i, 0, division, GridKind.RedLine);
+                continue;
+            }
             int next = i + 1;
             while (next < reds.Count && reds[next].Time == p.Time) next++;
             double limit = Math.Min(end, next < reds.Count ? reds[next].Time : end);
@@ -35,7 +41,7 @@ public static class BeatGrid
                 double t = p.Time + k * step;
                 if (t >= limit) break;
                 if (t < start) continue;
-                var kind = k == 0 ? GridKind.RedLine : k % (p.Meter * division) == 0 ? GridKind.Measure :
+                var kind = k == 0 ? GridKind.RedLine : k % ((long)p.Meter * division) == 0 ? GridKind.Measure :
                     k % division == 0 ? GridKind.Beat : GridKind.Subdivision;
                 yield return new(t, i, k, division, kind);
             }

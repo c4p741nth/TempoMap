@@ -14,6 +14,7 @@ public sealed class OsuFile
     private readonly bool bom;
     private readonly string newline;
     private int header = -1, end;
+    private readonly FileSaveSession saveSession = new();
     public IReadOnlyList<TimingPoint> TimingPoints { get; }
     /// <summary>
     /// Red lines sorted by time. Of red lines sharing a time the first in the file is kept, as osu! does (lazer's
@@ -150,16 +151,15 @@ public sealed class OsuFile
         return (bom ? Encoding.UTF8.Preamble.ToArray() : []).Concat(Encoding.UTF8.GetBytes(b.ToString())).ToArray();
     }
 
-    public void Save(string path, IEnumerable<TimingPoint> redLines)
+    public void Save(string path, IEnumerable<TimingPoint> redLines, FileSaveSession? session = null)
     {
         byte[] bytes = WithRedLines(redLines);
-        if (File.Exists(path)) File.Copy(path, path + ".bak", true);
-        File.WriteAllBytes(path, bytes);
+        (session ?? saveSession).Write(path, bytes);
     }
-    public void SaveTimingPoints(string path, IEnumerable<TimingPoint> points, string? audioFilename = null)
+    public void SaveTimingPoints(string path, IEnumerable<TimingPoint> points, string? audioFilename = null,
+        FileSaveSession? session = null)
     {
         byte[] bytes = WithTimingPoints(points, audioFilename);
-        if (File.Exists(path)) File.Copy(path, path + ".bak", true);
-        File.WriteAllBytes(path, bytes);
+        (session ?? saveSession).Write(path, bytes);
     }
 }

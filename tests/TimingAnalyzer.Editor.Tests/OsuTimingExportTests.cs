@@ -9,7 +9,7 @@ public class OsuTimingExportTests
     [InlineData(0)]
     [InlineData(-36)]
     [InlineData(15)]
-    public void LegacySavedShiftCannotOverrideFixedConversion(int legacyShift)
+    public void SavedShiftCanCustomizeClipboardCompensation(int legacyShift)
     {
         var directory = Directory.CreateTempSubdirectory();
         try
@@ -19,8 +19,8 @@ public class OsuTimingExportTests
             var settings = EditorSettings.Load(path);
             using var vm = new EditorViewModel(_ => throw new InvalidOperationException(), _ => throw new InvalidOperationException());
             vm.ApplySettings(settings);
-            Assert.Equal(-33, vm.OsuCopyShiftMs);
-            Assert.Equal(-33, vm.CaptureSettings().OsuCopyShiftMs);
+            Assert.Equal(legacyShift, vm.OsuCopyShiftMs);
+            Assert.Equal(legacyShift, vm.CaptureSettings().OsuCopyShiftMs);
         }
         finally { directory.Delete(true); }
     }

@@ -5,7 +5,7 @@ namespace TimingAnalyzer.Editor.Tests;
 public class WorkflowFollowupTests
 {
     [Fact]
-    public async Task PreparedAudioIsUsedForWaveformPlaybackAndSavedAudioFilename()
+    public async Task PreparedPlaybackDoesNotChangeTheSourceAudioReferenceWhenSaving()
     {
         string dir = Directory.CreateTempSubdirectory().FullName;
         string source = Path.Combine(dir, "source.wav"), prepared = Path.Combine(dir, "source.ogg"), map = Path.Combine(dir, "map.osu");
@@ -19,7 +19,7 @@ public class WorkflowFollowupTests
             await vm.LoadAsync(map);
             Assert.Equal(prepared, decoded); Assert.Equal(prepared, played); Assert.Equal(prepared, vm.AudioPath);
             vm.Save(map);
-            Assert.Equal("source.ogg", OsuFile.Load(map).AudioFilename);
+            Assert.Equal("source.wav", OsuFile.Load(map).AudioFilename);
         }
         finally { Directory.Delete(dir, recursive: true); }
     }

@@ -11,6 +11,7 @@ namespace TimingAnalyzer.Audio;
 public sealed class PlaybackEngine : IPlaybackEngine
 {
     private readonly string path;
+    private readonly double? decodedDurationMs;
     private readonly int device;
     private readonly double latencyMs;
     private readonly StreamProcedure clickProcedure;
@@ -27,9 +28,12 @@ public sealed class PlaybackEngine : IPlaybackEngine
     public bool IsPlaying => !disposed && tempo != 0 &&
         Bass.ChannelIsActive(tempo) is PlaybackState.Playing or PlaybackState.Stalled;
 
-    public PlaybackEngine(string audioPath)
+    public PlaybackEngine(string audioPath, double? decodedDurationMs = null)
     {
+        if (decodedDurationMs is { } duration && (!double.IsFinite(duration) || duration <= 0))
+            throw new ArgumentOutOfRangeException(nameof(decodedDurationMs));
         path = audioPath;
+        this.decodedDurationMs = decodedDurationMs;
         clickProcedure = ReadClicks; // Keep the delegate rooted for the entire native stream lifetime.
         if (!Bass.Init(-1, 44100, DeviceInitFlags.Latency)) throw Error("initialize default output device");
         device = Bass.CurrentDevice;
@@ -146,13 +150,46 @@ public sealed class PlaybackEngine : IPlaybackEngine
             rate = info.Frequency;
             long bytes = Bass.ChannelGetLength(song);
             if (bytes < 0) throw Error("read song length");
-            DurationMs = Bass.ChannelBytes2Seconds(song, bytes) * 1000;
+            long logicalBytes = decodedDurationMs is { } known ? Bass.ChannelSeconds2Bytes(song, known / 1000) : bytes;
+            DurationMs = Bass.ChannelBytes2Seconds(song, logicalBytes) * 1000;
             long seekBytes = Math.Clamp(Bass.ChannelSeconds2Bytes(song, position / 1000), 0,
-                Math.Max(0, bytes - sizeof(float) * info.Channels));
-            Check(Bass.ChannelSetPosition(song, seekBytes), "seek song");
+                Math.Max(0, logicalBytes - sizeof(float) * info.Channels));
+            // Windows' native FLAC decoder may report a length rounded down to whole seconds. The waveform
+            // has the decoded frame count. Seek to the last admitted frame, then decode the short remainder.
+            long admitted = Math.Min(seekBytes, Math.Max(0, bytes - sizeof(float) * info.Channels));
+            // A fresh stream already starts at zero. Some Windows codecs seek zero to the first later packet.
+            if (admitted != 0) Check(Bass.ChannelSetPosition(song, admitted), "seek song");
+            long actual = Bass.ChannelGetPosition(song);
+            if (actual < 0) throw Error("read seek position");
+            if (actual > seekBytes)
+            {
+                // Some Windows codecs round a seek to a packet after the requested frame. Start earlier and
+                // decode forward instead of moving the timing cursor to that rounded packet.
+                long earlier = Math.Max(0, admitted - (long)rate * sizeof(float) * info.Channels);
+                Check(Bass.ChannelSetPosition(song, earlier), "seek before song frame");
+                actual = Bass.ChannelGetPosition(song);
+                if (actual > seekBytes)
+                {
+                    Bass.StreamFree(song);
+                    song = Handle(Bass.CreateStream(path, 0, 0, BassFlags.Decode | BassFlags.Float | BassFlags.Prescan), "reopen song for exact seek");
+                    actual = Bass.ChannelGetPosition(song);
+                }
+                if (actual < 0 || actual > seekBytes) throw new IOException("The decoder cannot reach the requested audio frame.");
+            }
+            if (actual < seekBytes)
+            {
+                var discard = new float[4096 * info.Channels];
+                long remaining = seekBytes - actual;
+                while (remaining > 0)
+                {
+                    int read = Bass.ChannelGetData(song, discard, (int)Math.Min(remaining, discard.Length * sizeof(float)));
+                    if (read <= 0) throw new IOException("The decoder ended before the requested audio frame.");
+                    remaining -= read;
+                }
+            }
             startMs = pausedMs = Bass.ChannelBytes2Seconds(song, Bass.ChannelGetPosition(song)) * 1000;
             clickFrame = ClickSchedule.SampleAt(startMs, rate);
-            endFrame = bytes / (sizeof(float) * info.Channels);
+            endFrame = logicalBytes / (sizeof(float) * info.Channels);
             track = new ClickTrack(reds, rate, endFrame);
             callbackError = null;
             click = Handle(Bass.CreateStream(rate, 2, BassFlags.Decode | BassFlags.Float, clickProcedure), "create click stream");

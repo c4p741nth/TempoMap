@@ -9,9 +9,23 @@ namespace TimingAnalyzer.Editor;
 /// <summary>Prepare the exact audio used for both the waveform and playback, without overwriting source files.</summary>
 public sealed class AudioImport(string? ffmpeg = null, string? ffprobe = null)
 {
+    public sealed record ConversionOptions(int? SampleRate = null, double Quality = 6)
+    {
+        public void Validate()
+        {
+            if (SampleRate is < 8000 or > 192000 || !double.IsFinite(Quality) || Quality is < -1 or > 10)
+                throw new ArgumentException("Sample rate must be 8000–192000 Hz (or Original); Vorbis quality must be -1–10.");
+        }
+    }
+    public sealed record ToolStatus(string Encoder, bool EncoderAvailable, string Probe, bool ProbeAvailable);
     private const string QualityTag = "TEMPOMAP_VORBIS_QUALITY", SourceTag = "TEMPOMAP_SOURCE_SHA256";
-    private static string Tool(string name) => File.Exists(Path.Combine(AppContext.BaseDirectory, name + ".exe"))
-        ? Path.Combine(AppContext.BaseDirectory, name + ".exe") : name;
+    private static string Tool(string name)
+    {
+        string filename = name + ".exe", adjacent = Path.Combine(AppContext.BaseDirectory, filename);
+        if (File.Exists(adjacent)) return adjacent;
+        return (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+            .Select(directory => Path.Combine(directory.Trim('"'), filename)).FirstOrDefault(File.Exists) ?? name;
+    }
     private readonly string encoder = ffmpeg ?? Tool("ffmpeg"), probe = ffprobe ?? Tool("ffprobe");
 
     public sealed record AudioInfo(bool IsOgg, string Codec, int Channels, long NominalBitrate, string? Quality, string? SourceHash)
@@ -41,44 +55,53 @@ public sealed class AudioImport(string? ffmpeg = null, string? ffprobe = null)
     private async Task<AudioInfo> ProbeAsync(string path, CancellationToken cancellation) => ParseProbe(await Run(probe,
         ["-v", "error", "-show_streams", "-show_format", "-of", "json", path], cancellation).ConfigureAwait(false));
 
-    public async Task<string> PrepareAsync(string source, CancellationToken cancellation = default)
+    /// <summary>Opening always uses the original file; conversion is an explicit separate command.</summary>
+    public Task<string> PrepareAsync(string source, CancellationToken cancellation = default)
     {
+        cancellation.ThrowIfCancellationRequested();
         source = Path.GetFullPath(source);
-        var info = await ProbeAsync(source, cancellation).ConfigureAwait(false);
-        if (info.IsQuality6 && Path.GetExtension(source).Equals(".ogg", StringComparison.OrdinalIgnoreCase)) return source;
+        if (!File.Exists(source)) throw new FileNotFoundException("Audio file not found.", source);
+        return Task.FromResult(source);
+    }
+
+    public ToolStatus Diagnose() => new(encoder, Available(encoder), probe, Available(probe));
+    private static bool Available(string executable)
+    {
+        if (File.Exists(executable)) return true;
+        string filename = Path.HasExtension(executable) ? executable : executable + ".exe";
+        return (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+            .Any(directory => File.Exists(Path.Combine(directory.Trim('"'), filename)));
+    }
+
+    public async Task<string> ConvertAsync(string source, string destination, ConversionOptions? options = null,
+        CancellationToken cancellation = default)
+    {
+        options ??= new(); options.Validate();
+        source = Path.GetFullPath(source); destination = Path.GetFullPath(destination);
+        if (source.Equals(destination, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Choose a different output file; conversion never overwrites the source audio.");
+        if (!Path.GetExtension(destination).Equals(".ogg", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Choose an .ogg output filename.");
         string hash;
         await using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, useAsync: true))
             hash = Convert.ToHexString(await SHA256.HashDataAsync(input, cancellation).ConfigureAwait(false));
-        string directory = Path.GetDirectoryName(source)!, stem = Path.GetFileNameWithoutExtension(source);
-        string Candidate(int index) => Path.Combine(directory, stem + (index == 0 ? "" : index == 1 ? ".q6" :
-            ".q6." + index.ToString(CultureInfo.InvariantCulture)) + ".ogg");
-        int first = Path.GetExtension(source).Equals(".ogg", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
-        int slot = first;
-        for (; File.Exists(Candidate(slot)); slot++)
-        {
-            cancellation.ThrowIfCancellationRequested();
-            try
-            {
-                var cached = await ProbeAsync(Candidate(slot), cancellation).ConfigureAwait(false);
-                if (cached.IsQuality6 && cached.SourceHash == hash) return Candidate(slot);
-            }
-            catch (InvalidDataException) { /* An unrelated or broken sibling remains untouched. */ }
-        }
-        string temporary = Path.Combine(directory, ".tempomap-" + Guid.NewGuid().ToString("N") + ".ogg");
+        string quality = options.Quality.ToString("0.##", CultureInfo.InvariantCulture);
+        string temporary = FileSaveSession.TemporaryPath(destination) + ".ogg";
         try
         {
-            await Run(encoder, ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", source,
-                "-map", "0:a:0", "-vn", "-c:a", "libvorbis", "-q:a", "6", "-metadata", QualityTag + "=6",
-                "-metadata", SourceTag + "=" + hash, temporary], cancellation).ConfigureAwait(false);
-            if (!(await ProbeAsync(temporary, cancellation).ConfigureAwait(false)).IsQuality6)
-                throw new InvalidDataException("The converted audio is not Ogg Vorbis quality 6.");
-            // Move only into an unused name; another import may have claimed the proposed name meanwhile.
-            while (true)
+            List<string> arguments = ["-nostdin", "-hide_banner", "-loglevel", "error", "-n", "-i", source,
+                "-map", "0:a:0", "-vn", "-c:a", "libvorbis", "-q:a", quality];
+            if (options.SampleRate is { } rate) arguments.AddRange(["-ar", rate.ToString(CultureInfo.InvariantCulture)]);
+            arguments.AddRange(["-metadata", QualityTag + "=" + quality, "-metadata", SourceTag + "=" + hash, temporary]);
+            await Run(encoder, arguments.ToArray(), cancellation).ConfigureAwait(false);
+            cancellation.ThrowIfCancellationRequested();
+            using (var converted = new FileStream(temporary, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
             {
-                cancellation.ThrowIfCancellationRequested();
-                try { File.Move(temporary, Candidate(slot)); return Candidate(slot); }
-                catch (IOException) when (File.Exists(Candidate(slot))) { slot++; }
+                if (converted.Length == 0) throw new InvalidDataException("The converter produced an empty file.");
+                converted.Flush(flushToDisk: true);
             }
+            new FileSaveSession().CommitPrepared(temporary, destination);
+            return destination;
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
@@ -92,7 +115,7 @@ public sealed class AudioImport(string? ffmpeg = null, string? ffprobe = null)
         foreach (string argument in arguments) start.ArgumentList.Add(argument);
         using var process = new Process { StartInfo = start };
         try { process.Start(); }
-        catch (Win32Exception ex) { throw new IOException("Audio import needs ffmpeg and ffprobe beside TempoMap.exe or on PATH. " + ex.Message, ex); }
+        catch (Win32Exception ex) { throw new IOException("Ogg conversion needs ffmpeg beside TempoMap.exe or on PATH. Opening the original audio does not need it. " + ex.Message, ex); }
         var output = process.StandardOutput.ReadToEndAsync(cancellation);
         var errors = process.StandardError.ReadToEndAsync(cancellation);
         try { await process.WaitForExitAsync(cancellation).ConfigureAwait(false); }

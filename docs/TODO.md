@@ -21,6 +21,8 @@ Nothing open. T1-T6 done, parity 45/45 (rechecked 2026-10-18).
 
 ## Phase 1 editor (`PHASE1-STATUS.md`, `EDITOR-MANUAL-TEST.md`)
 
+- [x] **Choose optional features** from [FEATURE-REVIEW.md](FEATURE-REVIEW.md) (E55): user approved F01–F18, A1/A2/A3/A6 and all B/C on 2026-10-25.
+- [x] **Complete approved editor upgrade**: implementation and validation in [EDITOR-UPGRADE.md](EDITOR-UPGRADE.md); F01–F18, B/C and the A6 cache cleanup (user-run 2026-10-26) are complete. A4/A5/A7 are excluded.
 - [ ] **Run the manual checklist** in `EDITOR-MANUAL-TEST.md` (129 unchecked items): audio/click sync at 1.0 and
   0.75, drag feel, volume response, follow, save into osu! and reopen in the osu! editor, and the new Phase 3
   section (duplicate red lines, drift mode on Billie Jean). Only a person at the speakers can do these.

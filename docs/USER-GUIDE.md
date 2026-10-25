@@ -4,8 +4,9 @@
 
 ## Open, analyze and apply
 
-Open a song or `.osu` file with **Ctrl+O**, or drop it into the window. Audio is prepared as Ogg Vorbis quality 6;
-the original file is preserved. `ffmpeg` and `ffprobe` must be available for conversion.
+Open a song or `.osu` file from File, or drop it into the window. Audio opens in its original format;
+opening and playback do not require ffmpeg. Optional Ogg conversion is a separate command with sample-rate
+and quality controls (default quality 6), and keeps the source file.
 
 **Auto-time** analyzes the song and displays a proposal. For one BPM, the existing BPM/Offset/Apply group holds
 the result. Edit either value and press **Apply**. Multiple-tempo proposals apply several red lines.
@@ -76,7 +77,7 @@ Algorithm measurements and failure cases belong in [Phase 3 results](PHASE3-STAT
 Paste with **Ctrl+V**; rows at the same time are kept and marked as overlaps. Copy normalized is unnecessary:
 normalization is an explicit editing mode and its output is already visible.
 
-The current Copy commands apply the user's **-33 ms** osu! calibration outside TempoMap.
+Copy defaults to **-33 ms** outside TempoMap. Settings → Keyboard shortcuts / copy profiles changes that value or selects a named setup.
 Internal paste and Save retain source timing. Read [the clipboard details](AUDIO-IMPORT.md) and
 [the calibration measurements](OSU-AUDIO-TIMING.md) before assuming another setup needs the same shift.
 
@@ -84,3 +85,24 @@ Save writes timing into an `.osu` file. Check it in osu! with audio and metronom
 The [manual checklist](EDITOR-MANUAL-TEST.md) tracks remaining desktop/audio acceptance.
 
 **F1** opens key/color help; **F2** opens the Thai tool guide. Help → About shows the app version and author.
+
+
+## Workspace and projects
+
+**F3** opens Listening, Display/bookmarks and Proposal/review tools. Listening includes range loop/pre-roll,
+alternate speed, tap tempo, explicit A/B beat counts, multipliers and shift/BPM steps. On narrow windows,
+music/metronome sliders are here; the main playback row stays visible.
+
+Display offers filtered waveforms, onset strength, spectrogram, SV/Kiai lanes and four rows of measures.
+Middle-drag pans, the top ruler shows time, and the overview seeks across the whole song. The table splitter resizes its panel.
+Review shows proposed lines before Apply, current/proposed metronome audition, approximate BPM alternatives,
+and a next-issue queue after Check sections. Alternative scores are relative signal strength, not confidence probabilities.
+
+File → Save project stores a `.tmap` session with pending proposals, typed BPM, markers and view/listening state.
+The app asks before discarding edited timing and offers recovery after an interrupted session. Save .osu remains
+the game export; Save As, Revert and recent files are in File. Export .osz includes the current difficulty,
+original audio and local media without saving over the source map.
+
+File → Convert audio to Ogg explicitly creates another file with sample-rate and Vorbis quality controls (default 6).
+Audio diagnostics explains native/tool availability. This build's native Opus decoder is unavailable: use the explicit converter
+with ffmpeg, then open the converted file. [คู่มือภาษาไทยและตัวอย่าง](TOOLS-TH.md) covers each workflow.

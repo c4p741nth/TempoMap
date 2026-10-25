@@ -19,6 +19,8 @@ TempoMap documentation is grouped by what you need to do. [Back to the project](
 | [Development](DEVELOPMENT.md) | Build, offline setup, tests, CLI, branding and source layout |
 | [Release workflow](RELEASE.md) | Branches, CI, packaging and draft releases |
 | [To do](TODO.md) | Current open work across phases |
+| [Approved editor upgrade](EDITOR-UPGRADE.md) | Implementation, validation and the blocked cache cleanup |
+| [Feature review (ไทย)](FEATURE-REVIEW.md) | ArrowVortex/Tempora research; F01–F18 subsequently approved |
 
 ## Algorithms and measurements
 

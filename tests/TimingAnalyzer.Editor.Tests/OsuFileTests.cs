@@ -7,6 +7,24 @@ namespace TimingAnalyzer.Editor.Tests;
 
 public class OsuFileTests
 {
+    [Fact]
+    public void RepeatedSavesPreserveTheOriginalBackup()
+    {
+        string directory = Directory.CreateTempSubdirectory().FullName;
+        string path = Path.Combine(directory, "timing.osu");
+        byte[] original = Encoding.UTF8.GetBytes("[General]\r\nAudioFilename: song.mp3\r\n[TimingPoints]\r\n0,500\r\n");
+        try
+        {
+            File.WriteAllBytes(path, original);
+            var document = OsuFile.Load(path);
+            document.Save(path, [new(0, 400)]);
+            document.Save(path, [new(0, 300)]);
+            Assert.Equal(original, File.ReadAllBytes(path + ".bak"));
+            Assert.Equal(300, Assert.Single(OsuFile.Load(path).RedLines).BeatLength);
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
     [Theory]
     [InlineData("steady-multi.osu")]
     [InlineData("ramp-mania.osu")]

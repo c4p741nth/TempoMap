@@ -28,28 +28,25 @@ Status values: `todo`, `in-progress`, `done`, `blocked`.
 
 ## Last stop
 
-E54 (2026-10-25): TempoMap casing is consistent in the current app/EXE, metadata, release/packaging templates
-and active guides. README now introduces the product and routes users to focused docs. User explicitly chose
-PR-only CI: PRs into develop/main build/test, PRs into main also package; no extra develop push CI.
-Main PR checks stay because they test the merge result. Release still validates/packages its actual main commit.
+F01–F18, A1/A2/A3 and all B/C are implemented and verified. A4/A5/A7 were explicitly excluded.
+**U1–U10 are all done.** The A6 deletion was run by the user on 2026-10-26; do not redo the features. Next: commit (user handles Git),
+then the listening/osu! acceptance checks.
 
-- When: 2026-10-25
-- Who (executor/model): Codex
-- Status/commit: E50-E54 uncommitted on base 567dcc8; no git state mutation/network action.
-- Validation: normal Release 0 warnings/errors; C# 293 passed, Python 10 passed,
-  headless MainWindow 56 checks (Skia, shared bitmap/casing and E52 Auto-time reruns/Apply).
-  Exact normal filenames and EXE ProductName/FileDescription are TempoMap; normal/tested DLL hashes match.
-  49 local Markdown links and 77 active text files audited; all icon frames match.
-  PowerShell scripts parse. Byte-exact .osu CRLF preserved: whitespace check uses cr-at-eol plus all normal checks.
-- Next step: `src/TimingAnalyzer.App/bin/Release/net10.0/win-x64/TempoMap.exe`.
-  User already confirmed Explorer's mint icon. Desktop shortcut resolves to this file on Windows; its stored
-  target spelling remains historical after COM normalization, so the attempted edit was restored byte-exact.
-  CI event matrix/conditions reviewed locally; no YAML parser package added and no remote Actions run or package
-  created. Changes take effect on GitHub after the user pushes. Manual checklist: 129 unchecked.
-  E52 compiled scratch still awaits cleanup after earlier policy rejection; this task reused its UI output.
-- Evidence: `.dotnet-home/branding-20261025/verified.json`, final-tests, python-tests.log, ui-final.log,
-  observed-checks.json, EXE metadata/native icon extractions; E50-E53 evidence retained. No version/package/Core/
-  reference/reverse changes, release or server operations.
+- When: 2026-10-26 · Codex · uncommitted on base 2777d9e. User handles Git; no state mutation/server calls.
+- Normal executable: src/TimingAnalyzer.App/bin/Release/net10.0/win-x64/TempoMap.exe; version 20261023.0 unchanged.
+- Release solution 0 warnings/errors; C# 313 passed (Editor 271, Core 42), Python 10 passed.
+- MainWindow 131 checks at 1280x720/900x500 with 553 rows: input/remap/preferences, listening/display/review,
+  typed BPM locks, cancellation, recovery and Save .osu from the dirty guard. Normal DLLs match smoke output.
+- Native 11/12 extensions open/play/seek; Opus is unavailable and points to explicit conversion.
+  FLAC reported-length and WMA packet rounding/zero-seek boundaries corrected.
+- Envelope/autocorrelation SHA and full analysis match pre-change on 3 songs. Parallel bands were bit-identical
+  but slower on most inputs, so scalar arithmetic stays. Actual old-audio collection/full/range inference reuse verified.
+- Cleanup: 36 ignored targets/3741 files/3,335,745,202 bytes; no tracked/reparse files in checked scopes.
+  Codex's manifest and literal-path deletion were rejected: "blocked by policy". The user ran
+  .dotnet-home/editor-upgrade/cleanup-approved.ps1 (revalidates; supports -WhatIf) on 2026-10-26; afterwards 0/36 targets
+  exist and .eval-cache is gone. Kept: .dotnet-home/{.dotnet,.templateengine,editor-upgrade} (198 files, 7.3 MB).
+- Details: docs/EDITOR-UPGRADE.md; evidence .dotnet-home/editor-upgrade/validation.json, final-suite/, ui/final.log,
+  native/, cache/, perf/, artifact-hashes.json. Listening/osu! acceptance remains a user check.
 
 ## Phase 1 editor follow-up
 

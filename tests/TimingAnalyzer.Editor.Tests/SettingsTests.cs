@@ -33,9 +33,9 @@ public class SettingsTests
         Assert.Equal((32, 5), (other.SelectedShiftBeatStep.Divisor, other.SelectedShiftMsStep));
 
         // Defaults: a fresh record, a missing file, a broken file; values the window would not accept are skipped.
-        Assert.Equal(new EditorSettings(), EditorSettings.Load(path + ".missing"));
+        Assert.Equivalent(new EditorSettings(), EditorSettings.Load(path + ".missing"));
         File.WriteAllText(path, "{ not json");
-        Assert.Equal(new EditorSettings(), EditorSettings.Load(path));
+        Assert.Equivalent(new EditorSettings(), EditorSettings.Load(path));
         other.ApplySettings(new EditorSettings { Speed = "9.9", SnapDivisor = 10, AutoMode = "Drift 7 beats", MusicVolumePercent = 400, TableTab = 9,
             ShiftBeatDivisor = 3, ShiftMs = 7, Theme = "invalid-theme" });
         Assert.Equal("Light", other.SelectedTheme);

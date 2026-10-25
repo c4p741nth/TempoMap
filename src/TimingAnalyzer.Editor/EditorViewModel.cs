@@ -20,7 +20,7 @@ public sealed record RedLineRow(int Index, TimingPoint Point, bool InSelection =
     public override int GetHashCode() => HashCode.Combine(Index, Point);
 }
 
-public sealed class EditorViewModel : ObservableObject, IDisposable
+public sealed partial class EditorViewModel : ObservableObject, IDisposable
 {
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
     private readonly Func<string, Task<AudioContent>> loadAudio;
@@ -60,18 +60,18 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     private MultiTimingProposal? multiProposal;
     private string proposalOffsetText = "";
     private string proposalBpmText = "";
-    public AutoTimingProposal? Proposal { get => proposal; private set { SetProperty(ref proposal, value); proposalBpmText = value is null ? "" : OsuPrecision.FormatBpm(value.Bpm); OnPropertyChanged(nameof(AnalysisBpmText)); OnPropertyChanged(nameof(ProposalDescription)); OnPropertyChanged(nameof(HasProposal)); OnPropertyChanged(nameof(HasSingleProposal)); } }
+    public AutoTimingProposal? Proposal { get => proposal; private set { SetProperty(ref proposal, value); proposalBpmText = value is null ? "" : OsuPrecision.FormatBpm(value.Bpm); OnPropertyChanged(nameof(AnalysisBpmText)); OnPropertyChanged(nameof(ProposalDescription)); OnPropertyChanged(nameof(HasProposal)); OnPropertyChanged(nameof(HasSingleProposal)); RefreshProposalPreview(); } }
     /// <summary>A one-line proposal waits: its offset can be edited before Apply.</summary>
     public bool HasSingleProposal => Proposal is not null;
     /// <summary>The multi-BPM proposal, when one was made. Mutually exclusive with <see cref="Proposal"/>.</summary>
-    public MultiTimingProposal? MultiProposal { get => multiProposal; private set { SetProperty(ref multiProposal, value); OnPropertyChanged(nameof(ProposalDescription)); OnPropertyChanged(nameof(ProposalSections)); OnPropertyChanged(nameof(HasProposal)); } }
+    public MultiTimingProposal? MultiProposal { get => multiProposal; private set { SetProperty(ref multiProposal, value); OnPropertyChanged(nameof(ProposalDescription)); OnPropertyChanged(nameof(ProposalSections)); OnPropertyChanged(nameof(HasProposal)); RefreshProposalPreview(); } }
     /// <summary>A proposal waits to be applied: the window shows its description, offset box and apply buttons.</summary>
     public bool HasProposal => Proposal is not null || MultiProposal is not null;
     /// <summary>One readable row per proposed red line; empty unless a multi-BPM proposal is pending.</summary>
     public IReadOnlyList<string> ProposalSections => MultiProposal?.Lines ?? [];
     public string ProposalDescription => Proposal?.Description ?? MultiProposal?.Description ?? "Auto-time proposes one red line for the whole song; review it before replacing red lines. " +
         "For several BPMs, place a red line at each section start and use Auto-time section or Fit offset.";
-    public string ProposalOffsetText { get => proposalOffsetText; set => SetProperty(ref proposalOffsetText, value); }
+    public string ProposalOffsetText { get => proposalOffsetText; set { if (SetProperty(ref proposalOffsetText, value)) RefreshProposalPreview(); } }
     private string lockedBpmText = "";
     /// <summary>Empty: detect the BPM. A number: lock it, so auto-time fits only the offset.</summary>
     public string LockedBpmText { get => lockedBpmText; set { if (SetProperty(ref lockedBpmText, value ?? "")) OnPropertyChanged(nameof(AnalysisBpmText)); } }
@@ -82,7 +82,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         set
         {
             if (HasSingleProposal) SetProperty(ref proposalBpmText, value ?? "");
-            LockedBpmText = value ?? "";
+            LockedBpmText = value ?? ""; RefreshProposalPreview();
         }
     }
     private string tempoFactorText = "0.5";
@@ -124,7 +124,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public string? BeatmapPath { get; private set; }
     public string? AudioPath { get; private set; }
     public AudioContent? Audio { get; private set; }
-    public bool IsBusy { get => busy; private set { SetProperty(ref busy, value); OnPropertyChanged(nameof(CanInteract)); } }
+    public bool IsBusy { get => busy; private set { if (busy == value) return; if (value) BeginOperation(); SetProperty(ref busy, value); if (!value) EndOperation(); OnPropertyChanged(nameof(CanInteract)); } }
     public bool CanInteract => !IsBusy;
     public bool HasAudio => Audio is not null;
     public IReadOnlyList<string> ThemeOptions { get; } = ["Dark", "Light", "System"];
@@ -139,7 +139,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public double PositionMs
     {
         get => position;
-        private set { SetProperty(ref position, value); OnPropertyChanged(nameof(PositionLabel)); }
+        private set { if (SetProperty(ref position, value)) OnPropertyChanged(nameof(PositionLabel)); }
     }
     /// <summary>osu! editor style: <c>00:01:531</c> is the same instant as offset 1531.</summary>
     public string PositionLabel => TimeFormat.Osu(PositionMs) + " / " + TimeFormat.Osu(DurationMs);
@@ -242,7 +242,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         }
     }
     /// <summary>Moves the playhead to a time and brings it into view, including when playback follow is off.</summary>
-    public void JumpTo(double timeMs) => Run(() =>
+    public void JumpTo(double timeMs) => Transport(() =>
     {
         Seek(timeMs);
         StartMs = FollowViewport.Start(PositionMs, SpanMs, DurationMs);
@@ -250,7 +250,8 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     /// <summary>The loaded map's "Artist - Title [Version] (Creator)", or the audio file name.</summary>
     public string SongTitle => Document?.SongTitle ?? (AudioPath is not null ? Path.GetFileName(AudioPath) :
         BeatmapPath is not null ? Path.GetFileName(BeatmapPath) : "No song loaded");
-    public string WindowTitle => Document is null && AudioPath is null ? AppInfo.Title : SongTitle + " - " + AppInfo.ShortTitle;
+    public string WindowTitle => (Document is null && AudioPath is null ? AppInfo.Title : SongTitle + " - " + AppInfo.ShortTitle) +
+        (IsDirty ? " *" : "");
     public IReadOnlyList<int> SelectedIndices => selection;
     public string SelectionLabel => greenSelection.Length > 0 && selection.Length == 0 ? Count(greenSelection.Length, "green line") + " selected"
         : greenSelection.Length > 0
@@ -283,7 +284,6 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public bool AlignToEdge { get => alignToEdge; set => SetProperty(ref alignToEdge, value); }
     /// <summary>Auto-time starts its first red line on a bar's first beat, by the beat model's bar starts (Core BarStart).</summary>
     public bool StartOnBar { get => startOnBar; set => SetProperty(ref startOnBar, value); }
-    public int OsuCopyShiftMs => OsuTimingExport.ShiftMs;
     public string TimeText { get => timeText; set => SetProperty(ref timeText, value); }
     public string BpmText { get => bpmText; set => SetProperty(ref bpmText, value); }
     public string MeterText { get => meterText; set => SetProperty(ref meterText, value); }
@@ -293,12 +293,15 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         MusicVolumePercent = MusicVolumePercent, ClickVolumePercent = ClickVolumePercent, ClickEnabled = ClickEnabled,
         FollowPlayhead = FollowPlayhead, Speed = SelectedSpeed, SnapDivisor = SnapDivisor, AutoMode = SelectedAutoMode,
         TableTab = TableTab, ShiftBeatDivisor = SelectedShiftBeatStep.Divisor, ShiftMs = SelectedShiftMsStep,
-        BpmStep = SelectedBpmStep, AlignToEdge = AlignToEdge, StartOnBar = StartOnBar, Theme = SelectedTheme, AutoNormalizeSv = AutoNormalizeSv,
+        BpmStep = SelectedBpmStep, AlignToEdge = AlignToEdge, StartOnBar = StartOnBar, Theme = SelectedTheme, AutoNormalizeSv = AutoNormalizeSv, OsuCopyShiftMs = OsuCopyShiftMs, CopyProfiles = copyProfiles.ToArray(),
     };
     /// <summary>Applies remembered settings through the same setters as the window, so out-of-range values are ignored.</summary>
     public void ApplySettings(EditorSettings s)
     {
         SelectedTheme = s.Theme;
+        OsuCopyShiftMs = s.OsuCopyShiftMs;
+        copyProfiles = (s.CopyProfiles ?? []).Where(p => p is not null && !string.IsNullOrWhiteSpace(p.Name) && p.ShiftMs is >= -10000 and <= 10000).Take(20).ToArray();
+        OnPropertyChanged(nameof(CopyProfiles));
         AutoNormalizeSv = s.AutoNormalizeSv;
         MusicVolumePercent = s.MusicVolumePercent; ClickVolumePercent = s.ClickVolumePercent;
         ClickEnabled = s.ClickEnabled; FollowPlayhead = s.FollowPlayhead;
@@ -314,7 +317,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public string SelectedSpeed
     {
         get => selectedSpeed;
-        set => Run(() =>
+        set => Transport(() =>
         {
             double speed = PlaybackMath.ValidateSpeed(double.Parse(value, Invariant));
             if (playback is not null) playback.Speed = speed;
@@ -325,12 +328,12 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public bool ClickEnabled
     {
         get => clickEnabled;
-        set => Run(() => { if (playback is not null) playback.ClickEnabled = value; SetProperty(ref clickEnabled, value); });
+        set => Transport(() => { if (playback is not null) playback.ClickEnabled = value && !momentaryMute; SetProperty(ref clickEnabled, value); });
     }
     public double MusicVolumePercent
     {
         get => musicVolumePercent;
-        set => Run(() =>
+        set => Transport(() =>
         {
             double volume = PlaybackMath.ClampVolume(value / 100);
             if (playback is not null) playback.MusicVolume = volume;
@@ -341,7 +344,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public double ClickVolumePercent
     {
         get => clickVolumePercent;
-        set => Run(() =>
+        set => Transport(() =>
         {
             double volume = PlaybackMath.ClampVolume(value / 100);
             if (playback is not null) playback.ClickVolume = volume;
@@ -388,8 +391,8 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         JumpToStartCommand = new RelayCommand(() => JumpTo(0));
         JumpToEndCommand = new RelayCommand(() => JumpTo(DurationMs));
         DeleteCommand = new RelayCommand(Delete);
-        UndoCommand = new RelayCommand(Undo);
-        RedoCommand = new RelayCommand(Redo);
+        UndoCommand = new RelayCommand(Undo, () => CanUndo && !IsBusy);
+        RedoCommand = new RelayCommand(Redo, () => CanRedo && !IsBusy);
         BpmFromSpacingCommand = new RelayCommand(BpmFromSpacing);
         ScaleTempoCommand = new RelayCommand<string>(value => ScaleTempo(double.Parse(value!, Invariant)));
         FillRampCommand = new RelayCommand(FillRamp);
@@ -404,9 +407,13 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         Edits.Changed += TimingChanged;
     }
 
+    private FileSaveSession saveSession = new();
+    private string? sourceAudioPath;
+
     public async Task LoadAsync(string path)
     {
         if (IsBusy || disposed) return;
+        if (Path.GetExtension(path).Equals(".tmap", StringComparison.OrdinalIgnoreCase)) { await LoadProjectAsync(path); return; }
         IsBusy = true;
         LockedBpmText = ""; ProposalOffsetText = "";
         try
@@ -414,6 +421,9 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
             var doc = Path.GetExtension(path).Equals(".osu", StringComparison.OrdinalIgnoreCase) ? OsuFile.Load(path) : null;
             string? song = doc is null ? path : doc.AudioFilename is null ? null :
                 Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path))!, doc.AudioFilename));
+            sourceAudioPath = song is null ? null : Path.GetFullPath(song);
+            saveSession = new();
+            ProjectPath = null; bookmarks = []; savedBookmarks = [];
             playback?.Dispose(); playback = null;
             CancelDrag();
             Edits.Changed -= TimingChanged;
@@ -427,14 +437,16 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
             PositionMs = 0; start = 0; span = 10000;
             playing = false; followSuspended = false; nextEngineReadMs = 0;
             playheadClock.Synchronize(0, wallMilliseconds(), 1, false, snap: true);
+            MarkSaved(includeWorkspace: true);
             TimingChanged(); NotifyView();
             if (song is null || !File.Exists(song)) { Status = "Timing loaded; audio file is missing. Open the map beside its AudioFilename." + DuplicateNote(doc); return; }
-            Status = "Preparing Ogg Vorbis quality 6 audio...";
-            song = await prepareAudio(song, lifetime.Token);
+            Status = "Opening original audio...";
+            song = await prepareAudio(song, AnalysisToken);
             if (disposed) return;
             AudioPath = song;
             Status = "Loading waveform from " + Path.GetFileName(song) + "...";
             var content = await loadAudio(song);
+            AnalysisToken.ThrowIfCancellationRequested();
             if (disposed) return;
             Audio = content;
             span = Math.Min(10000, Math.Max(1, DurationMs));
@@ -461,27 +473,27 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     }
     private static string DuplicateNote(OsuFile? doc) => doc is { DuplicateRedLines: > 0 and var n }
         ? string.Create(Invariant, $" ({n} overlapping red line{(n == 1 ? "" : "s")} retained; the first controls playback)") : "";
-    public void TogglePlay() => Run(() =>
+    public void TogglePlay() => Transport(() =>
     {
         if (playback is null) return;
-        if (playback.IsPlaying) playback.Pause();
-        else { playback.Play(); followSuspended = false; followedSection = -1; }
+        if (playback.IsPlaying) { rangeAuditionActive = false; playback.Pause(); }
+        else { rangeAuditionActive = LoopEnabled && range is not null; playback.Play(); followSuspended = false; followedSection = -1; }
         ReadPlayback(wallMilliseconds(), snap: true);
     });
     /// <summary>Click-to-seek and ←/→ also end a scroll suspension: the user is back at the playhead.</summary>
-    public void Seek(double ms) => Run(() =>
+    public void Seek(double ms) => Transport(() =>
     {
         followSuspended = false;
         playback?.Seek(ms);
         if (playback is not null) ReadPlayback(wallMilliseconds(), snap: true);
         else PositionMs = Math.Clamp(ms, 0, DurationMs);
     });
-    public void RefreshPosition() => Run(() => ReadPlayback(wallMilliseconds()));
-    public void UpdateFrame() => Run(() =>
+    public void RefreshPosition() => Transport(() => ReadPlayback(wallMilliseconds()));
+    public void UpdateFrame() => Transport(() =>
     {
         double now = wallMilliseconds();
         if (heldDirection != 0 && Scrub(now)) return;
-        if (playback is null) return;
+        if (playback is null || !playing && !playheadClock.WaitingForStart) return;
         // Until the sound starts after a seek or Play the engine is read every frame, so the head leaves on time.
         if (now >= nextEngineReadMs || playheadClock.WaitingForStart) ReadPlayback(now);
         else UpdateDisplay(now);
@@ -499,6 +511,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     private void UpdateDisplay(double now)
     {
         PositionMs = Math.Clamp(playheadClock.PositionAt(now), 0, DurationMs);
+        LoopRangeIfNeeded();
         ApplyFollow();
         FollowSection();
     }
@@ -911,7 +924,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     /// <summary>The audio files Open and drag-and-drop take (what the decoder reads); beatmaps are .osu.</summary>
     public static IReadOnlyList<string> AudioExtensions { get; } =
         [".mp3", ".ogg", ".wav", ".flac", ".mp4", ".m4a", ".aac", ".opus", ".wma", ".aif", ".aiff", ".oga"];
-    public static bool CanOpen(string path) => IsBeatmap(path) || IsAudio(path);
+    public static bool CanOpen(string path) => IsBeatmap(path) || IsAudio(path) || string.Equals(Path.GetExtension(path), ".tmap", StringComparison.OrdinalIgnoreCase);
     private static bool IsBeatmap(string path) => Path.GetExtension(path).Equals(".osu", StringComparison.OrdinalIgnoreCase);
     private static bool IsAudio(string path) => AudioExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
     /// <summary>
@@ -921,7 +934,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public async Task OpenDroppedAsync(IEnumerable<string> paths)
     {
         var files = paths.ToList();
-        if ((files.FirstOrDefault(IsBeatmap) ?? files.FirstOrDefault(IsAudio)) is { } path) await LoadAsync(path);
+        if ((files.FirstOrDefault(IsBeatmap) ?? files.FirstOrDefault(p => Path.GetExtension(p).Equals(".tmap", StringComparison.OrdinalIgnoreCase)) ?? files.FirstOrDefault(IsAudio)) is { } path) await LoadAsync(path);
         else Status = "Drop an osu! beatmap (.osu) or an audio file (" + string.Join(", ", AudioExtensions) + ") to open it.";
     }
     /// <summary>
@@ -968,7 +981,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         string label = RangeLabel;
         Status = "Analyzing " + label + "...";
         MultiTimingDetection detection;
-        try { detection = await analyze(Audio, new RangeRequest(r.Start, r.End, bpm, bpm is null ? DriftBeatsPerLine : 0, bpm is null && BeatModelSelected)); }
+        try { detection = await analyze(Audio, new RangeRequest(r.Start, r.End, bpm, bpm is null ? DriftBeatsPerLine : 0, bpm is null && BeatModelSelected)); AnalysisToken.ThrowIfCancellationRequested(); }
         catch (Exception ex) { Status = "Auto-time range failed: " + ex.Message; return; }
         finally { IsBusy = false; }
         if (disposed) return;
@@ -1004,7 +1017,9 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         Status = "Analyzing audio...";
         try
         {
-            Proposal = AutoTimingProposal.FromDetection(await analyze(Audio, new TimingRequest(0, DurationMs, bpm)), locked: bpm is not null);
+            var detected = await analyze(Audio, new TimingRequest(0, DurationMs, bpm));
+            AnalysisToken.ThrowIfCancellationRequested();
+            Proposal = AutoTimingProposal.FromDetection(detected, locked: bpm is not null);
             ProposalOffsetText = Proposal.OffsetMs is { } offset ? OsuPrecision.FormatTime(offset) : "";
             Status = Proposal.Description;
         }
@@ -1034,7 +1049,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         CancelDrag(); IsBusy = true;
         Status = "Analyzing section " + OsuPrecision.FormatTime(start) + "–" + OsuPrecision.FormatTime(end) + " ms...";
         TimingDetection detection;
-        try { detection = await analyze(Audio, new TimingRequest(start, end, bpm)); }
+        try { detection = await analyze(Audio, new TimingRequest(start, end, bpm)); AnalysisToken.ThrowIfCancellationRequested(); }
         catch (Exception ex) { Status = "Auto-time failed: " + ex.Message; return; }
         finally { IsBusy = false; }
         if (disposed) return;
@@ -1075,7 +1090,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         CancelDrag(); IsBusy = true;
         Status = "Looking for onsets...";
         IReadOnlyList<double?> found;
-        try { found = await find(Audio, queries); }
+        try { found = await find(Audio, queries); AnalysisToken.ThrowIfCancellationRequested(); }
         catch (Exception ex) { Status = "Snap to onsets failed: " + ex.Message; return; }
         finally { IsBusy = false; }
         if (disposed) return;
@@ -1147,7 +1162,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
 
     // Section check (C): the sections whose grid the onsets do not support, worth a listen.
     private IReadOnlyList<SectionMark> marks = [];
-    public IReadOnlyList<SectionMark> Marks { get => marks; private set { marks = value; OnPropertyChanged(nameof(Marks)); OnPropertyChanged(nameof(HasMarks)); } }
+    public IReadOnlyList<SectionMark> Marks { get => marks; private set { marks = value; OnPropertyChanged(nameof(Marks)); OnPropertyChanged(nameof(HasMarks)); reviewedSections.Clear(); OnPropertyChanged(nameof(ReviewQueue)); } }
     public bool HasMarks => marks.Count > 0;
     /// <summary>
     /// Check sections: scores every red line's section against the onsets and lists the ones worth a listen (the
@@ -1162,7 +1177,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         var before = Edits.RedLines.ToArray();
         Status = "Checking sections...";
         IReadOnlyList<SectionMark?> found;
-        try { found = await check(Audio, before); }
+        try { found = await check(Audio, before); AnalysisToken.ThrowIfCancellationRequested(); }
         catch (Exception ex) { Status = "Check failed: " + ex.Message; return; }
         finally { IsBusy = false; }
         if (disposed) return;
@@ -1285,6 +1300,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         try
         {
             var detection = await analyze(Audio);
+            AnalysisToken.ThrowIfCancellationRequested();
             var found = MultiTimingProposal.FromDetection(detection);
             // Played drums: a hint only, the 2026-10-18 probe could not measure most live songs (DrumWobble).
             string hint = detection.LiveDrums is { } live
@@ -1364,7 +1380,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public string ClipboardText() => TimingClipboard.Write(Edits.RedLines.Concat(Greens));
 
     /// <summary>Copy for a calibrated osu! setup. Normalize before shifting, so the main BPM uses original song times.</summary>
-    public string OsuClipboardText() => OsuTimingExport.Write(NormalizedTiming().Points);
+    public string OsuClipboardText() => OsuTimingExport.Write(NormalizedTiming().Points, OsuCopyShiftMs);
 
     private ScrollNormalization.Result NormalizedTiming() => normalization ??= AutoNormalizeSv
         ? LiveNormalization.Build(Edits.RedLines, Edits.GreenLines, NormalizationEnd)
@@ -1392,12 +1408,14 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public void Save(string path) => Run(() =>
     {
         CancelDrag();
-        var doc = Document ?? (AudioPath is not null ? OsuFile.Create(Path.GetRelativePath(
-            Path.GetDirectoryName(Path.GetFullPath(path))!, AudioPath)) : throw new InvalidOperationException("Open audio or a beatmap first."));
-        doc.SaveTimingPoints(path, NormalizedTiming().Points, AudioPath is null ? null : Path.GetRelativePath(
-            Path.GetDirectoryName(Path.GetFullPath(path))!, AudioPath));
+        var doc = Document ?? (sourceAudioPath is not null ? OsuFile.Create(Path.GetRelativePath(
+            Path.GetDirectoryName(Path.GetFullPath(path))!, sourceAudioPath)) : throw new InvalidOperationException("Open audio or a beatmap first."));
+        doc.SaveTimingPoints(path, NormalizedTiming().Points, sourceAudioPath is null ? null : Path.GetRelativePath(
+            Path.GetDirectoryName(Path.GetFullPath(path))!, sourceAudioPath), saveSession);
         Document = OsuFile.Load(path); BeatmapPath = Path.GetFullPath(path);
-        Status = "Saved " + Path.GetFileName(path) + ". Existing files are backed up as .osu.bak.";
+        MarkSaved(includeWorkspace: false);
+        Status = "Saved " + Path.GetFileName(path) + (saveSession.LastBackupPath is { } backup
+            ? ". Original backup: " + Path.GetFileName(backup) + "." : ".");
         NotifyView();
     });
     private void TimingChanged()
@@ -1405,7 +1423,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         normalization = null;
         if (marks.Count > 0) Marks = [];
         followedSection = -1;
-        Run(() => playback?.SetTiming(Edits.RedLines));
+        Run(() => playback?.SetTiming(AuditionProposal && ProposedTiming.Count > 0 ? ProposedTiming : Edits.RedLines));
         // Keep the selected lines that still exist; otherwise fall back to the first red line.
         var reds = Edits.RedLines.ToList();
         int Find(TimingPoint p) => reds.FindIndex(r => ReferenceEquals(r, p));
@@ -1418,6 +1436,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     }
     private void NotifyView()
     {
+        NotifyDirty(); NotifyHistory();
         normalization = null;
         OnPropertyChanged(nameof(Edits)); OnPropertyChanged(nameof(Audio)); OnPropertyChanged(nameof(Document));
         OnPropertyChanged(nameof(HasAudio));
@@ -1436,5 +1455,5 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         if (IsBusy || disposed) return;
         try { action(); } catch (Exception ex) { Status = ex.Message; }
     }
-    public void Dispose() { disposed = true; lifetime.Cancel(); playback?.Dispose(); playback = null; Edits.Changed -= TimingChanged; }
+    public void Dispose() { disposed = true; lifetime.Cancel(); operationCancellation?.Cancel(); playback?.Dispose(); playback = null; Edits.Changed -= TimingChanged; }
 }

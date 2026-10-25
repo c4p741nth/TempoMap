@@ -77,7 +77,7 @@ public class ExportTests
             byte[] edited = File.ReadAllBytes(path);
             vm.Save(path);
             Assert.Equal(edited, File.ReadAllBytes(path));
-            Assert.Equal(edited, File.ReadAllBytes(path + ".bak"));
+            Assert.Equal(original, File.ReadAllBytes(path + ".bak"));
         }
         finally { File.Delete(path); File.Delete(path + ".bak"); Directory.Delete(dir); }
     }

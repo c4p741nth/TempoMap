@@ -7,7 +7,7 @@ using TimingAnalyzer.Editor;
 
 namespace TimingAnalyzer.App;
 
-public sealed class WaveformControl : Control
+public sealed partial class WaveformControl : Control
 {
     private EditorViewModel? model;
     // Box select: a left drag from empty space that travels more than BoxThreshold px. A shorter one is a click (seek).
@@ -33,7 +33,7 @@ public sealed class WaveformControl : Control
         DataContextChanged += (_, _) =>
         {
             if (model is not null) model.PropertyChanged -= ModelChanged;
-            model = DataContext as EditorViewModel;
+            lanePoints = null; model = DataContext as EditorViewModel;
             if (model is not null) model.PropertyChanged += ModelChanged;
             InvalidateVisual();
         };
@@ -49,7 +49,15 @@ public sealed class WaveformControl : Control
         for (int i = 0; i < keys.Length; i++) gridPens[i] = new(Brush(keys[i], gridPens[i].Brush!), i == 3 ? 2 : 1);
         InvalidateVisual();
     }
-    private void ModelChanged(object? sender, PropertyChangedEventArgs e) => InvalidateVisual();
+    private void ModelChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(EditorViewModel.TableRows)) lanePoints = null;
+        if (e.PropertyName is nameof(EditorViewModel.Audio) or nameof(EditorViewModel.DisplayRedLines) or
+            nameof(EditorViewModel.StartMs) or nameof(EditorViewModel.SpanMs) or nameof(EditorViewModel.PositionMs) or
+            nameof(EditorViewModel.SelectedIndices) or nameof(EditorViewModel.Range) or nameof(EditorViewModel.Marks) or
+            nameof(EditorViewModel.SnapDivisor) or nameof(EditorViewModel.TableRows) or nameof(EditorViewModel.WaveformLayer) or nameof(EditorViewModel.ShowOnsets) or
+            nameof(EditorViewModel.ShowSv) or nameof(EditorViewModel.ShowKiai) or nameof(EditorViewModel.GhostProposal) or nameof(EditorViewModel.ProposedTiming) or nameof(EditorViewModel.Bookmarks)) InvalidateVisual();
+    }
     public override void Render(DrawingContext context)
     {
         base.Render(context);
@@ -57,21 +65,24 @@ public sealed class WaveformControl : Control
         context.DrawLine(gridPens[0], new(0, Bounds.Height / 2), new(Bounds.Width, Bounds.Height / 2));
         if (model is null || Bounds.Width < 1 || Bounds.Height < 1) return;
         double X(double time) => (time - model.StartMs) * Bounds.Width / model.SpanMs;
-        if (model.Audio is { } audio)
+        PrepareVisuals();
+        if (model.Audio is { } audio && model.WaveformLayer != "Spectrogram")
         {
-            int a = (int)Math.Clamp(Math.Floor(model.StartMs * audio.Rate / 1000), 0, audio.Peaks.SampleCount);
-            int b = (int)Math.Clamp(Math.Ceiling((model.StartMs + model.SpanMs) * audio.Rate / 1000), a, audio.Peaks.SampleCount);
-            var peaks = audio.Peaks.Query(a, b, Math.Max(1, (int)Bounds.Width));
-            var full = audio.Peaks.Range(0, audio.Peaks.SampleCount);
+            var signalPeaks = filtered?.Peaks ?? audio.Peaks; int signalRate = filtered?.Rate ?? audio.Rate;
+            int a = (int)Math.Clamp(Math.Floor(model.StartMs * signalRate / 1000), 0, signalPeaks.SampleCount);
+            int b = (int)Math.Clamp(Math.Ceiling((model.StartMs + model.SpanMs) * signalRate / 1000), a, signalPeaks.SampleCount);
+            var peaks = signalPeaks.Query(a, b, Math.Max(1, (int)Bounds.Width));
+            var full = signalPeaks.Range(0, signalPeaks.SampleCount);
             double scale = Bounds.Height * 0.4 / Math.Max(1, Math.Max(Math.Abs(full.Min), Math.Abs(full.Max)));
             for (int i = 0; i < peaks.Length; i++) context.DrawLine(wave,
                 new(i, Bounds.Height / 2 - peaks[i].Max * scale), new(i, Bounds.Height / 2 - peaks[i].Min * scale));
         }
+        DrawVisualLayers(context, X);
         var reds = model.DisplayRedLines;
         // Beat-snap ticks closer than 4 px would only paint the background; fall back to whole beats.
         int division = model.SnapDivisor;
         if (reds.Count > 0 && reds.Min(p => p.BeatLength) / division * Bounds.Width / model.SpanMs < 4) division = 1;
-        foreach (var line in BeatGrid.Query(reds, model.StartMs, model.StartMs + model.SpanMs, division).Take(5000))
+        foreach (var line in BeatGrid.Query(reds, model.StartMs, model.StartMs + model.SpanMs, division, minimumBeatLength: 50).Take(5000))
         {
             double x = X(line.Time);
             context.DrawLine(gridPens[(int)line.Kind], new(x, 0), new(x, Bounds.Height));
@@ -110,7 +121,11 @@ public sealed class WaveformControl : Control
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        if (model is null || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (model is null) return;
+        if (e.GetCurrentPoint(this).Properties.IsMiddleButtonPressed)
+        { panX = e.GetPosition(this).X; panStart = model.StartMs; e.Pointer.Capture(this); e.Handled = true; return; }
+        if (e.GetCurrentPoint(this).Properties.IsRightButtonPressed) { model.Seek(TimeAt(e.GetPosition(this).X)); return; }
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         Focus();
         double x = e.GetPosition(this).X;
         ranging = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
@@ -128,6 +143,8 @@ public sealed class WaveformControl : Control
     {
         base.OnPointerMoved(e);
         double x = e.GetPosition(this).X;
+        Hover(e);
+        if (panX is { } px && model is not null) { model.ManualStartMs = panStart - (x - px) * model.SpanMs / Math.Max(1, Bounds.Width); return; }
         if (model?.IsDragging == true) model.UpdateDrag(TimeAt(x));
         else if (pressX is { } from && (boxing || Math.Abs(x - from) > BoxThreshold))
         {
@@ -138,6 +155,7 @@ public sealed class WaveformControl : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        if (panX is not null) { panX = null; e.Pointer.Capture(null); e.Handled = true; return; }
         if (model?.IsDragging == true) { model.CommitDrag(); e.Handled = true; }
         else if (model is not null && pressX is { } from)
         {
@@ -151,7 +169,7 @@ public sealed class WaveformControl : Control
     }
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
-        base.OnPointerCaptureLost(e); model?.CancelDrag(); EndBox();
+        base.OnPointerCaptureLost(e); panX = null; model?.CancelDrag(); EndBox();
     }
     private void EndBox()
     {
