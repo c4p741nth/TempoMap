@@ -8,10 +8,13 @@ public static class BeatGrid
     public static TimingPoint[] Sort(IEnumerable<TimingPoint> points)
     {
         var result = points.Select(p => p.Validate()).OrderBy(p => p.Time).ToArray();
-        if (result.Any(p => !p.Uninherited) || result.Zip(result.Skip(1)).Any(p => p.First.Time == p.Second.Time))
-            throw new ArgumentException("Red lines must have distinct times.");
+        if (result.Any(p => !p.Uninherited)) throw new ArgumentException("Expected red lines.");
         return result;
     }
+
+    /// <summary>First red line at a time controls playback; the table retains every duplicate.</summary>
+    public static TimingPoint[] Effective(IEnumerable<TimingPoint> points) => Sort(points)
+        .GroupBy(p => p.Time).Select(g => g.First()).ToArray();
 
     /// <summary>Half-open range [start, end); a new red line truncates the previous section.</summary>
     public static IEnumerable<GridLine> Query(IReadOnlyList<TimingPoint> reds, double start, double end, int division = 1)
@@ -21,7 +24,10 @@ public static class BeatGrid
         for (int i = 0; i < reds.Count; i++)
         {
             var p = reds[i];
-            double limit = Math.Min(end, i + 1 < reds.Count ? reds[i + 1].Time : end);
+            if (i > 0 && reds[i - 1].Time == p.Time) continue;
+            int next = i + 1;
+            while (next < reds.Count && reds[next].Time == p.Time) next++;
+            double limit = Math.Min(end, next < reds.Count ? reds[next].Time : end);
             double step = p.BeatLength / division;
             long first = Math.Max(0, (long)Math.Floor((start - p.Time) / step));
             for (long k = first; ; k++)

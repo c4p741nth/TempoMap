@@ -26,7 +26,7 @@ public partial class MainWindow : Window
         {
             var decoded = AudioDecoder.Read(path);
             return AudioContent.Create(decoded.Mono, checked((int)decoded.Rate));
-        }), path => new PlaybackEngine(path));
+        }), path => new PlaybackEngine(path), prepareAudio: new AudioImport().PrepareAsync);
         DataContext = model;
         ApplySettings(EditorSettings.Load(SettingsPath));
         // The size to remember is the last one the window had before it was maximised.
@@ -42,6 +42,8 @@ public partial class MainWindow : Window
         // them: otherwise Space would press the last clicked button again instead of playing.
         AddHandler(KeyDownEvent, HandleTransportKey, RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, SwallowSpaceUp, RoutingStrategies.Tunnel);
+        // Save before a clicked row changes the selection, including controls that do not take keyboard focus.
+        AddHandler(PointerPressedEvent, SavePointBeforeClick, RoutingStrategies.Tunnel);
         // A .osu or an audio file dropped anywhere on the window opens it, as File → Open does.
         AddHandler(DragDrop.DragEnterEvent, DragOverFiles);
         AddHandler(DragDrop.DragOverEvent, DragOverFiles);
@@ -55,7 +57,6 @@ public partial class MainWindow : Window
             if (e.PropertyName == nameof(EditorViewModel.SelectedIndices))
             {
                 // A selection made elsewhere (waveform box, Esc, follow) replaces the table's green rows too.
-                if (!syncingTable) selectedGreens.Clear();
                 QueueTableSync();
             }
             else if (e.PropertyName == nameof(EditorViewModel.TableRows)) QueueTableSync();
@@ -63,20 +64,16 @@ public partial class MainWindow : Window
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyRow.BringIntoView(), Avalonia.Threading.DispatcherPriority.Background);
         };
     }
-    // The table selects red and green rows; the red ones are the model's selection (what the editing tools act on),
-    // the green ones live here and only matter for Copy selected.
-    private bool syncingTable, syncQueued;
-    private HashSet<TimingPoint> selectedGreens = [];
+    // Both kinds of point can be selected and edited; tempo tools still use the red selection.
+    private bool syncingTable, syncQueued, savingPointFields;
+    private static readonly DataFormat<string> InternalTimingFormat = DataFormat.CreateStringApplicationFormat("Tempomap.TimingPoints.v1");
     private void TableSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        if (syncingTable) return;
+        if (syncingTable || savingPointFields) return;
         var rows = TimingTable.SelectedItems?.OfType<TimingRow>().ToList() ?? [];
-        selectedGreens = rows.Where(r => r.IsGreen).Select(r => r.Point).ToHashSet();
-        var reds = rows.Where(r => r.IsRed).Select(r => r.RedIndex).ToList();
-        int primary = e.AddedItems.OfType<TimingRow>().LastOrDefault(r => r.IsRed)?.RedIndex ??
-            (model.SelectedRow is { } current && reds.Contains(current.Index) ? current.Index : reds.FirstOrDefault(-1));
+        var primary = e.AddedItems.OfType<TimingRow>().LastOrDefault() ?? rows.LastOrDefault();
         syncingTable = true;
-        try { model.SelectRows(reds, primary); }
+        try { model.SelectTableRows(rows, primary); }
         finally { syncingTable = false; }
         // A click only selects; a double-click jumps there (TableDoubleTapped).
     }
@@ -87,6 +84,77 @@ public partial class MainWindow : Window
             model.JumpTo(row.Point.Time);
     }
     private void SelectAllRows(object? sender, RoutedEventArgs e) => TimingTable.SelectAll();
+    private void AddPointForTab(object? sender, RoutedEventArgs e)
+    {
+        if (model.TableTab == 2) AddInheritedPoint(sender, e);
+        else AddTimingPoint(sender, e);
+    }
+    private void AddTimingPoint(object? sender, RoutedEventArgs e) { if (SavePointFields()) { model.Insert(); FocusPointValue(); } }
+    private void AddInheritedPoint(object? sender, RoutedEventArgs e) { if (SavePointFields()) { model.InsertInherited(); FocusPointValue(); } }
+    private void FocusPointValue() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+    {
+        PointValueBox.BringIntoView(); PointValueBox.Focus(); PointValueBox.SelectAll();
+    }, Avalonia.Threading.DispatcherPriority.Background);
+    private void PointFieldFocused(object? sender, FocusChangedEventArgs e) => model.IsEditingPoint = true;
+    private void PointFieldBlurred(object? sender, RoutedEventArgs e)
+    {
+        if (!SavePointFields()) model.RestorePointFields();
+        model.IsEditingPoint = PointTimeBox.IsFocused || PointValueBox.IsFocused || PointMeterBox.IsFocused;
+    }
+    private bool SavePointFields()
+    {
+        if (savingPointFields) return true;
+        savingPointFields = true;
+        try { return model.TryApplyFields(); }
+        finally { savingPointFields = false; }
+    }
+    private void SavePointBeforeClick(object? sender, PointerPressedEventArgs e)
+    {
+        if (!model.IsEditingPoint) return;
+        var focused = PointTimeBox.IsFocused ? PointTimeBox : PointValueBox.IsFocused ? PointValueBox : PointMeterBox.IsFocused ? PointMeterBox : null;
+        if (focused is null || (e.Source as Visual)?.GetSelfAndVisualAncestors().Contains(focused) == true) return;
+        var clicked = (e.Source as Visual)?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault()?.DataContext as TimingRow;
+        if (!SavePointFields()) model.RestorePointFields();
+        if (clicked is not null && e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            // Saving Time can reorder/rebuild the list under this pointer event. Resolve the actual clicked point
+            // again instead of letting the detached ListBoxItem select its old index.
+            var rows = model.TableRows;
+            var target = rows.FirstOrDefault(r => ReferenceEquals(r.Point, clicked.Point)) ?? rows.FirstOrDefault(r => r.Point == clicked.Point)
+                ?? rows.FirstOrDefault(r => r.IsRed == clicked.IsRed && (r.IsRed ? r.RedIndex == model.SelectedRow?.Index : model.SelectedGreenIndices.Contains(r.GreenIndex)));
+            if (target is not null)
+            {
+                var chosen = rows.Where(r => r.IsRed ? model.SelectedIndices.Contains(r.RedIndex) : model.SelectedGreenIndices.Contains(r.GreenIndex)).ToList();
+                if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+                {
+                    int anchor = rows.ToList().FindIndex(r => r.IsRed ? r.RedIndex == model.SelectedRow?.Index : model.SelectedGreenIndices.Contains(r.GreenIndex));
+                    int end = rows.ToList().IndexOf(target);
+                    if (anchor < 0) anchor = end;
+                    chosen = rows.Skip(Math.Min(anchor, end)).Take(Math.Abs(end - anchor) + 1).ToList();
+                }
+                else if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+                {
+                    if (!chosen.Remove(target)) chosen.Add(target);
+                }
+                else chosen = [target];
+                model.SelectTableRows(chosen, chosen.Contains(target) ? target : chosen.LastOrDefault());
+                SyncTable();
+            }
+            TimingTable.Focus();
+            e.Handled = true;
+            return;
+        }
+        // A click on the waveform or a label may leave keyboard focus in the field.
+        if ((e.Source as Visual)?.GetSelfAndVisualAncestors().Contains(PointFields) != true) TimingTable.Focus();
+    }
+    private void PointFieldKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers != KeyModifiers.None || e.Key is not (Key.Enter or Key.Escape)) return;
+        if (e.Key == Key.Enter && !SavePointFields()) { e.Handled = true; return; }
+        if (e.Key == Key.Escape) model.RestorePointFields();
+        TimingTable.Focus();
+        e.Handled = true;
+    }
     private void ExitApp(object? sender, RoutedEventArgs e) => Close();
     /// <summary>
     /// Esc closes a dialog as its cancel/close button does. On the tunnel, so a focused button or text does not take the
@@ -109,8 +177,10 @@ public partial class MainWindow : Window
             "Space: play / pause\n←/→: step the playhead by the beat snap · hold past 0.3 s and it runs on, faster the longer you hold (like Audacity)\n" +
             "Wheel: scroll · Ctrl+wheel: zoom · Click: seek\n" +
             "Drag a red line: move it · Ctrl+drag a beat: stretch the BPM\nDrag an empty area: box-select red lines\n" +
-            "Ctrl+P or Insert: add a timing point here (a new red line at the playhead) · Delete: delete the selected red lines\n" +
-            "Ctrl+Shift+P: move the selected red line onto the playhead · Drop a .osu or an audio file on the window: open it\n" +
+            "Ctrl+P: add a red timing point and type its BPM · Ctrl+G: add a green inherited point and type its SV\n" +
+            "Insert / +: add the tab's point type (All/Timing: red; Inherited: green) · Enter / leave field: save · Esc in field: cancel\n" +
+            "Delete: delete selected points · Ctrl+Shift+P: move the selected point onto the playhead\n" +
+            "Home / End: go to song start / end · Drop a .osu or an audio file on the window: open it\n" +
             "Shift+←/→ or Shift+drag: highlight a range · Ctrl+R: auto-time the range · Esc: clear the range, then the selection\n" +
             "Ctrl+V: paste timing points (Ctrl+Shift+V replaces all red lines)\n" +
             "Ctrl+K: check sections (marks the ones worth a listen) · Ctrl+L: fill a ramp between the selected red lines\n" +
@@ -140,6 +210,7 @@ public partial class MainWindow : Window
         syncQueued = false;
         if (TimingTable.ItemsSource is not IReadOnlyList<TimingRow> items) return;
         var reds = model.SelectedIndices.ToHashSet();
+        var greens = model.SelectedGreenIndices.ToHashSet();
         syncingTable = true;
         try
         {
@@ -149,12 +220,17 @@ public partial class MainWindow : Window
             {
                 selection.Clear();
                 for (int i = 0; i < items.Count; i++)
-                    if (items[i].IsRed ? reds.Contains(items[i].RedIndex) : selectedGreens.Contains(items[i].Point)) selection.Select(i);
+                    if (items[i].IsRed ? reds.Contains(items[i].RedIndex) : greens.Contains(items[i].GreenIndex)) selection.Select(i);
             }
             finally { selection.EndBatchUpdate(); }
         }
         finally { syncingTable = false; }
-        if (model.SelectedRow is { } row)
+        if (model.SelectedGreenIndices.LastOrDefault(-1) is >= 0 and var green)
+        {
+            for (int i = 0; i < items.Count; i++)
+                if (items[i].IsGreen && items[i].GreenIndex == green) { TimingTable.ScrollIntoView(i); break; }
+        }
+        else if (model.SelectedRow is { } row)
             for (int i = 0; i < items.Count; i++)
                 if (items[i].RedIndex == row.Index) { TimingTable.ScrollIntoView(i); break; }
     }
@@ -166,9 +242,9 @@ public partial class MainWindow : Window
             var rows = TimingTable.SelectedItems?.OfType<TimingRow>().OrderBy(r => r.Point.SerializedTime).ThenBy(r => r.IsGreen).ToList() ?? [];
             if (rows.Count == 0) { model.ReportError("Select rows in the timing table first (Ctrl+A selects every row of the tab)."); return; }
             if (Clipboard is null) throw new IOException("Clipboard unavailable.");
-            await Clipboard.SetTextAsync(EditorViewModel.RowsClipboardText(rows));
+            await WriteTimingClipboard(EditorViewModel.RowsClipboardText(rows));
             int red = rows.Count(r => r.IsRed);
-            model.ReportError("Copied " + red + " red and " + (rows.Count - red) + " green timing point rows - paste them into the osu! editor.");
+            model.ReportError(string.Create(CultureInfo.InvariantCulture, $"Copied {red} red and {rows.Count - red} green rows for osu! (-33 ms). Pasting here keeps their original times."));
         }
         catch (Exception ex) { model.ReportError(ex.Message); }
     }
@@ -179,7 +255,7 @@ public partial class MainWindow : Window
         // Written only when it moves, so the layout pass it causes settles instead of looping.
         static void Set(Control c, double value) { if (Math.Abs(c.MaxHeight - value) > 0.5) c.MaxHeight = value; }
         Set(TopScroll, Math.Max(48, MainArea.Bounds.Height - BottomPanel.Bounds.Height - BottomPanel.Margin.Top -
-            TopScroll.Margin.Bottom - ScrollSlider.Bounds.Height - MinWaveformHeight));
+            TopScroll.Margin.Bottom - SeekBar.Bounds.Height - MinWaveformHeight));
         Set(DetailsScroll, Math.Max(48, RightPanel.Bounds.Height - RedLinesTitle.Bounds.Height - RedLinesTitle.Margin.Bottom -
             TableHeader.Bounds.Height - TableHeader.Margin.Bottom - DetailsScroll.Margin.Top - MinListHeight));
     }
@@ -212,7 +288,16 @@ public partial class MainWindow : Window
         e.Source is TextBox || e.Source is Visual v && v.GetVisualAncestors().OfType<TextBox>().Any();
     private void HandleTransportKey(object? sender, KeyEventArgs e)
     {
-        if (InTextBox(e) || model.IsBusy) return;
+        if (model.IsBusy) return;
+        if (e.Key == Key.P && e.KeyModifiers == KeyModifiers.Control)
+        { AddTimingPoint(this, new RoutedEventArgs()); e.Handled = true; return; }
+        if (e.Key == Key.G && e.KeyModifiers == KeyModifiers.Control)
+        { AddInheritedPoint(this, new RoutedEventArgs()); e.Handled = true; return; }
+        if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.Control)
+        { if (SavePointFields()) ApplyAutoTime(this, new RoutedEventArgs()); e.Handled = true; return; }
+        if (e.Key == Key.P && e.KeyModifiers == (KeyModifiers.Control | KeyModifiers.Shift))
+        { if (SavePointFields()) model.MoveToPlayhead(); e.Handled = true; return; }
+        if (InTextBox(e)) return;
         if (e.Key == Key.Space) { model.TogglePlay(); e.Handled = true; }
         // ←/→: one beat-snap step, and held past 300 ms the playhead runs on, faster the longer (EditorViewModel.ArrowDown);
         // the OS key repeats only tell it the key is still down.
@@ -240,7 +325,8 @@ public partial class MainWindow : Window
             model.ShiftMsCommand.Execute(ms.ToString(CultureInfo.InvariantCulture));
             e.Handled = true;
         }
-        else if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.Control) { ApplyAutoTime(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (e.Key == Key.Home && e.KeyModifiers == KeyModifiers.None) { model.JumpTo(0); e.Handled = true; }
+        else if (e.Key == Key.End && e.KeyModifiers == KeyModifiers.None) { model.JumpTo(model.DurationMs); e.Handled = true; }
     }
     // A button clicks on Space release; the press was taken by the transport, so the release must not click.
     private void SwallowSpaceUp(object? sender, KeyEventArgs e)
@@ -322,7 +408,7 @@ public partial class MainWindow : Window
         try
         {
             if (Clipboard is null) throw new IOException("Clipboard unavailable.");
-            string? text = await Clipboard.TryGetTextAsync();
+            string? text = await Clipboard.TryGetValueAsync(InternalTimingFormat) ?? await Clipboard.TryGetTextAsync();
             if (string.IsNullOrWhiteSpace(text)) { model.ReportError("The clipboard holds no text to paste."); return; }
             if (replaceAll && !await Confirm("Replace all red lines?", "Replace every red line with the pasted ones? Green lines are kept, and one undo restores the old timing.")) return;
             model.Paste(text, replaceAll);
@@ -403,11 +489,21 @@ public partial class MainWindow : Window
         {
             if (Clipboard is null) throw new IOException("Clipboard unavailable.");
             string text = model.ClipboardText();
-            await Clipboard.SetTextAsync(text);
+            await WriteTimingClipboard(text);
             int rows = text.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
-            model.ReportError(rows + " timing point rows copied (no [TimingPoints] header) - paste them into the osu! editor.");
+            model.ReportError(string.Create(CultureInfo.InvariantCulture, $"Copied {rows} timing point rows for osu! (-33 ms). Pasting here keeps their original times."));
         }
         catch (Exception ex) { model.ReportError(ex.Message); }
+    }
+    private async Task WriteTimingClipboard(string original)
+    {
+        if (Clipboard is null) throw new IOException("Clipboard unavailable.");
+        var item = DataTransferItem.CreateText(OsuTimingExport.Write(TimingClipboard.Parse(original)));
+        item.Set(InternalTimingFormat, original);
+        var data = new DataTransfer();
+        data.Add(item);
+        await Clipboard.SetDataAsync(data);
+        await Clipboard.FlushAsync();
     }
     private async void CopyNormalized(object? sender, RoutedEventArgs e)
     {
@@ -415,7 +511,7 @@ public partial class MainWindow : Window
         {
             if (Clipboard is null) throw new IOException("Clipboard unavailable.");
             var (text, summary) = model.NormalizedClipboardText();
-            await Clipboard.SetTextAsync(text);
+            await WriteTimingClipboard(text);
             model.ReportError(summary);
         }
         catch (Exception ex) { model.ReportError(ex.Message); }
@@ -451,8 +547,7 @@ public partial class MainWindow : Window
         else if (e.Key == Key.M && plain) { model.ClickEnabled = !model.ClickEnabled; e.Handled = true; }
         else if (e.Key == Key.F && plain) { model.FollowPlayhead = !model.FollowPlayhead; e.Handled = true; }
         else if (e.Key == Key.S && ctrl) { SaveOsu(this, new RoutedEventArgs()); e.Handled = true; }
-        else if (e.Key == Key.P && ctrl && shift) { model.MoveToPlayhead(); e.Handled = true; }
-        else if (e.Key == Key.Insert || e.Key == Key.P && ctrl) { model.Insert(); e.Handled = true; }
+        else if (e.Key == Key.Insert && plain) { AddPointForTab(this, new RoutedEventArgs()); e.Handled = true; }
         else if (e.Key == Key.Delete) { model.Delete(); e.Handled = true; }
         else if (e.Key == Key.A && ctrl) { TimingTable.SelectAll(); e.Handled = true; }
         else if (e.Key == Key.C && ctrl) { _ = CopySelectedRows(); e.Handled = true; }

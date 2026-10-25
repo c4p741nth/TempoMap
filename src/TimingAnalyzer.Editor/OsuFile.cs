@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace TimingAnalyzer.Editor;
 
-/// <summary>Lossless UTF-8 document. Only red timing rows are regenerated on edit.</summary>
+/// <summary>UTF-8 document preserving non-timing sections and comments when timing rows are edited.</summary>
 public sealed class OsuFile
 {
     private sealed record Line(string Text, string Ending);
@@ -114,6 +114,18 @@ public sealed class OsuFile
             // Only red times are rounded; green rows retain their original (possibly fractional) times.
             .OrderBy(r => r.Point.SerializedTime)
             .ThenBy(r => !r.Point.Uninherited).Select(r => r.Text).ToArray();
+        return WriteRows(output);
+    }
+
+    public byte[] WithTimingPoints(IEnumerable<TimingPoint> points, string? audioFilename = null)
+    {
+        if (audioFilename?.IndexOfAny(['\r', '\n']) >= 0) throw new ArgumentException("Invalid audio filename.");
+        var all = points.Select(p => p.Validate()).OrderBy(p => p.SerializedTime).ThenBy(p => !p.Uninherited).ToArray();
+        return WriteRows(all.Select(p => p.ToOsuLine()).ToArray(), audioFilename);
+    }
+
+    private byte[] WriteRows(string[] output, string? audioFilename = null)
+    {
         var b = new StringBuilder();
         int next = 0;
         for (int i = 0; i < lines.Length; i++)
@@ -124,6 +136,8 @@ public sealed class OsuFile
             {
                 if (next < output.Length) b.Append(output[next++]).Append(lines[i].Ending.Length > 0 ? lines[i].Ending : newline);
             }
+            else if (audioFilename is not null && lines[i].Text.TrimStart().StartsWith("AudioFilename:", StringComparison.Ordinal))
+                b.Append("AudioFilename: ").Append(audioFilename).Append(lines[i].Ending);
             else b.Append(lines[i].Text).Append(lines[i].Ending);
         }
         if (header < 0)
@@ -139,6 +153,12 @@ public sealed class OsuFile
     public void Save(string path, IEnumerable<TimingPoint> redLines)
     {
         byte[] bytes = WithRedLines(redLines);
+        if (File.Exists(path)) File.Copy(path, path + ".bak", true);
+        File.WriteAllBytes(path, bytes);
+    }
+    public void SaveTimingPoints(string path, IEnumerable<TimingPoint> points, string? audioFilename = null)
+    {
+        byte[] bytes = WithTimingPoints(points, audioFilename);
         if (File.Exists(path)) File.Copy(path, path + ".bak", true);
         File.WriteAllBytes(path, bytes);
     }

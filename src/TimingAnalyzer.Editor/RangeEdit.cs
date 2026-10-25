@@ -38,20 +38,14 @@ public static class RangeEdit
     }
 
     /// <summary>
-    /// Pasted red lines (timing point rows) join the timing; one at the same time as an existing red line replaces it.
-    /// With <paramref name="replaceAll"/> they replace every red line. Green rows are left out (they are read-only
-    /// here) and counted.
+    /// Pasted red lines join the timing, duplicates included. With replaceAll they replace every red line.
     /// </summary>
     public static (TimingPoint[] Lines, TimingPoint[] Pasted, int Replaced, int Greens) Paste(IReadOnlyList<TimingPoint> reds, string text, bool replaceAll)
     {
         var rows = TimingClipboard.Parse(text);
-        var pasted = rows.Where(p => p.Uninherited).GroupBy(p => p.SerializedTime).Select(g => g.Last() with { Time = g.Key }).ToArray();
-        if (pasted.Length == 0)
-            throw new InvalidOperationException(rows.Length == 0
-                ? "The clipboard holds no timing point rows (copy them from a .osu [TimingPoints] section or the osu! editor)."
-                : "The clipboard holds only green lines; green lines are read-only here.");
-        var times = pasted.Select(p => p.Time).ToHashSet();
-        var kept = replaceAll ? [] : reds.Where(p => !times.Contains(OsuPrecision.Time(p.Time))).ToList();
+        var pasted = rows.Where(p => p.Uninherited).Select(p => p with { Time = p.SerializedTime }).ToArray();
+        if (rows.Length == 0) throw new InvalidOperationException("The clipboard holds no timing point rows.");
+        var kept = replaceAll ? [] : reds.ToList();
         int replaced = replaceAll ? reds.Count : reds.Count - kept.Count;
         return (BeatGrid.Sort(kept.Concat(pasted)), pasted, replaced, rows.Count(p => !p.Uninherited));
     }

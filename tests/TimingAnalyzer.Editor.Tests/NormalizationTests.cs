@@ -161,18 +161,27 @@ public class NormalizationTests
     }
 
     [Fact]
-    public async Task NormalizedCopyMeasuresTheMainBpmToTheLastNoteAndLeavesTheTimingAlone()
+    public async Task NormalizedCopyIncludesUnitLinesAndMeasuresTheWholeAudio()
     {
         var vm = await WithBeatmap("0,400,4,1,0,50,1,0\r\n10000,300,4,1,0,50,1,0\r\n20000,400,4,1,0,50,1,0\r\n",
             "64,192,1000,1,0,0:0:0:0:\r\n64,192,24000,128,0,26000:0:0:0:0:\r\n");
         var before = vm.Edits.RedLines.ToArray();
         var (text, summary) = vm.NormalizedClipboardText();
         var rows = TimingClipboard.Parse(text);
-        Assert.Equal(4, rows.Length);
-        Assert.Equal(0.75, rows.Single(r => !r.Uninherited).Sv, 9);
+        Assert.Equal(6, rows.Length);
+        Assert.Equal([1.0, 0.75, 1.0], rows.Where(r => !r.Uninherited).Select(r => r.Sv));
         Assert.Contains("normalised to 150 BPM", summary);
-        Assert.Contains("the last note at 00:26:000", summary);
-        Assert.Contains("1 added on red lines, 0 existing scaled", summary);
+        Assert.Contains("the end of the song at 05:00:000", summary);
+        Assert.Contains("3 added on red lines, 0 existing scaled", summary);
         Assert.Equal(before, vm.Edits.RedLines);
+    }
+
+    [Fact]
+    public async Task MainBpmUsesAudioTailRatherThanTheLastHitObject()
+    {
+        using var vm = await WithBeatmap("0,500,4,1,0,50,1,0\r\n6000,250,4,1,0,50,1,0\r\n",
+            "64,192,8000,1,0,0:0:0:0:\r\n");
+        Assert.Equal(240, vm.MainBpm);
+        Assert.Equal([2.0, 1.0], vm.InheritedRows.Select(r => r.Point.Sv));
     }
 }

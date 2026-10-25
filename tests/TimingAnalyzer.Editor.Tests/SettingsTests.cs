@@ -90,7 +90,7 @@ public class SettingsTests
         Assert.Equal(((string?)null, song), (vm.BeatmapPath, vm.AudioPath));
         await vm.OpenDroppedAsync([notes]);
         Assert.Equal(song, vm.AudioPath);
-        Assert.StartsWith("Drop an osu! beatmap (.osu) or an audio file (.mp3, .ogg, .wav, .flac, .mp4)", vm.Status);
+        Assert.Equal("Drop an osu! beatmap (.osu) or an audio file (" + string.Join(", ", EditorViewModel.AudioExtensions) + ") to open it.", vm.Status);
         Assert.True(EditorViewModel.CanOpen("A.OSU") && EditorViewModel.CanOpen("b.flac") && !EditorViewModel.CanOpen("c.osz") && !EditorViewModel.CanOpen("d"));
     }
 }

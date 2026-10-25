@@ -110,7 +110,7 @@ public class ShiftTests
         Assert.Throws<InvalidOperationException>(() => edits.ShiftRedLines(RedLineScope.Selected, 1));
         Assert.Throws<InvalidOperationException>(() => edits.ShiftRedLinesMs(RedLineScope.Selected, 1, 99));
         Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines(RedLineScope.All, 0.3));
-        Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines(RedLineScope.All, 1.0 / 64));
+        Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines(RedLineScope.All, 1.0 / 128));
         Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines(RedLineScope.All, 2));
         Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines(RedLineScope.All, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => edits.ShiftRedLines(RedLineScope.All, double.NaN));
@@ -169,7 +169,7 @@ public class ShiftTests
         await vm.LoadAsync(Path.GetTempFileName());
         vm.Edits.Replace([new(0, 500), new(4000, 480), new(9000, 400)]);
         vm.SelectRows([1], 1);
-        Assert.Equal(["1/1", "1/2", "1/4", "1/8", "1/16", "1/32"], vm.ShiftBeatSteps.Select(o => o.ToString()));
+        Assert.Equal(["1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/64"], vm.ShiftBeatSteps.Select(o => o.ToString()));
         Assert.Equal((4, 1), (vm.SelectedShiftBeatStep.Divisor, vm.SelectedShiftMsStep));
         vm.SelectedShiftBeatStep = vm.ShiftBeatSteps.First(o => o.Divisor == 32);
         vm.ShiftBeatStepCommand.Execute("1");

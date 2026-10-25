@@ -5,6 +5,10 @@
 osu!mania. Download it from the Releases page (Windows x64, no .NET install needed) and run `Tempomap.exe`. MIT licensed (see `LICENSE`); audio goes through BASS by un4seen, which is free for
 non-commercial use.
 
+Audio imports are prepared as Ogg Vorbis quality 6 before loading; `ffmpeg` and `ffprobe` must be on PATH or beside
+the executable. Original files are preserved. Copy applies the requested -33 ms osu! compensation; pasting within
+Tempomap keeps source times and duplicates rows. See [audio import and clipboard](docs/AUDIO-IMPORT.md).
+
 It started as a C# engine and Windows CLI rebuilding **TimingAnlyz 0.32.4 alpha**, with its recovered
 specification and Python reference. It auto-detects an osu! song's **BPM and offset** and flags
 parts that need extra timing sections. The C# CLI matches the original in **45/45 parity runs**.
@@ -194,13 +198,13 @@ move a timing point here, delete, select, copy and paste rows; **Timing**: auto-
 and the per-line tools;
 **Settings**: metronome, follow, restore default settings; **Help**: keys and colours (F1), about). Under it are
 three toolbars: playback (Play / Pause, Follow, beat snap, speed, metronome and music volume), Auto-time (mode, BPM
-box and, while a proposal waits, its offset and **Apply...**) and Shift (❮ step ❯ for beats and for ms, the step picked in a drop-down). The
+box, followed by a separate result row with offset and **Apply...** before the main BPM normalization note) and Shift (❮ step ❯ for beats and for ms, the step picked in a drop-down). The
 editor remembers volumes, metronome, follow, speed, beat snap, shift steps, auto-time mode, table tab and window size between
 runs (`%APPDATA%\Tempomap\settings.json`), with the BPM step and the two Auto-time choices; **Settings → Restore default settings** resets them.
 
 Shortcuts: Ctrl+O open .osu, Ctrl+Shift+O open audio, Ctrl+S save, Ctrl+Shift+C copy timing points, Ctrl+Shift+N
 copy normalized, Ctrl+T auto-time, Ctrl+Enter apply, Ctrl+R auto-time range, Ctrl+V paste timing points
-(Ctrl+Shift+V replacing all red lines), Ctrl+K check sections, Ctrl+L fill a ramp, Ctrl+P add a timing point at the playhead (Ctrl+Shift+P move the selected one there), Ctrl+←/→ shift the selected lines 1 ms (Ctrl+Shift+←/→ 5 ms), Ctrl+↑/↓ tune their BPM by the step in the Shift row (Ctrl+Shift: ten steps), Shift+←/→ highlight
+(Ctrl+Shift+V replacing all red lines), Ctrl+K check sections, Ctrl+L fill a ramp, Ctrl+P add a red timing point and focus BPM, Ctrl+G add a green inherited point and focus SV (from any tab), Ctrl+Shift+P move the selected point to the playhead, Home/End go to song start/end, Ctrl+←/→ shift the selected lines 1 ms (Ctrl+Shift+←/→ 5 ms), Ctrl+↑/↓ tune their BPM by the step in the Shift row (Ctrl+Shift: ten steps), Shift+←/→ highlight
 a range by the beat snap, M metronome, F follow, F1 the full list. Esc closes the Keys, About and confirm windows.
 
 The Avalonia editor opens audio or an osu! `.osu` beatmap, displays waveform peaks and a section-aware
@@ -219,12 +223,18 @@ dotnet run --project src/TimingAnalyzer.App -c Release --no-build --no-restore
 ```
 
 Open a map beside its audio file (File → Open, or drop the `.osu` or an audio file anywhere on the window). Click to seek, Space to play/pause, Ctrl+wheel to zoom, and wheel or
-the bottom slider to scroll. Drag a red line to move its offset; Ctrl+drag a later beat to stretch BPM
-with the section start fixed. **+** (Insert or Ctrl+P, "add timing point here") adds a red line at the playhead,
-**⇥** (Ctrl+Shift+P, "move timing point here") moves the selected red line onto the playhead instead (other selected
-lines move with it, keeping their spacing; one undo step), **−** (Delete) removes the selected lines, and Ctrl+Z/Ctrl+Y undo/redo. The side panel also accepts time, BPM and
-meter edits, applied with **✓**. Clicking a row in the timing table only selects it (the playhead stays);
-double-clicking jumps there (playhead on the line, line one third from the left); while playing with Follow on, the list selects and scrolls to the red line under the playhead. Space
+the bottom slider to scroll. The icons at its ends (Home/End) seek the yellow playhead and view to the start/end of the song,
+including while playing with Follow off. Drag a red line to move its offset; Ctrl+drag a later beat to stretch BPM
+with the section start fixed. The table toolbar keeps **+**, **−**, **⇥** together and visible:
+**+** / Insert adds a red point in All/Timing or a green point in Inherited. **Ctrl+P** always adds red and selects its BPM text;
+**Ctrl+G** always adds green and selects its SV text, switching to All when needed so the point is visible.
+**−** / Delete removes selected points; automatic normalization rows remain where needed.
+**⇥** / Ctrl+Shift+P moves the selected point and other selected points of the same kind onto the playhead.
+Ctrl+Z/Ctrl+Y undo/redo. Time, BPM, meter and green SV edits save on **Enter**, **Tab** or clicking outside;
+**Esc** in a field restores its saved value. Invalid Enter keeps focus and reports the error; leaving an invalid field restores its saved value.
+Unchanged fields preserve exact source precision and add no undo step. Clicking a row in the timing table only selects it (the playhead stays);
+double-clicking jumps there (playhead on the line, line one third from the left); while playing with Follow on, the list selects and scrolls to the red line under the playhead,
+except while typing or working with inherited points. Space
 always plays/pauses, even right after clicking another button (only text boxes keep it). The loaded song's
 "Artist - Title [Difficulty] (Mapper)" (or the audio file name) heads the window.
 
@@ -377,15 +387,15 @@ The **timing table** (right) has osu!'s three tabs, **All**, **Timing** and **In
 BPM or SV, meter, sample, volume, kiai). Click a row to select it, double-click to jump there; Ctrl+click and Shift+click select several, and
 the selected red lines are what the editing tools act on. **Copy** (Ctrl+C) copies the selected rows, red
 and green, as timing point rows to paste into the osu! editor; Ctrl+A selects every row of the tab. **Paste**
-(Ctrl+V) adds the red lines of timing point rows on the clipboard (from a .osu, the osu! editor or Copy), one at the
-time of an existing red line replacing it; Ctrl+Shift+V replaces all red lines (asks first). Green lines are
-read-only here, so pasted green rows are skipped.
+(Ctrl+V) adds red and green timing rows, retaining duplicates and marking same-kind overlaps orange;
+Ctrl+Shift+V replaces all red lines (asks first). Copy to osu! subtracts 33 ms; internal copy/paste keeps original times.
+Green points support Time/SV editing, addition with Ctrl+G, moving and deletion; required automatic normalization rows remain.
 
 **Copy normalized** copies red and green lines for osu!mania with the scroll speed held constant: every red line
-gets a green line with SV = main BPM / its BPM, the main BPM being the one held longest up to the last note, as
-osu! counts it (the end of the audio when the map has no notes yet). That is what most local mania maps with tempo
+gets a green line with SV = main BPM / its BPM, the main BPM being the one held longest over the whole audio.
+That is what most local mania maps with tempo
 changes do (295 of 481; 279 of them to that same main BPM). Existing green lines keep their own SV on top and their
-samples; a map that is already normalised is not normalised twice. The timing in the editor is not changed. Applying
+samples; a map that is already normalised is not normalised twice. Normalized greens are visible in the editor and saved. Applying
 an auto-time proposal now keeps the sample set, volume and kiai in effect at each new red line.
 
 **Multi-BPM songs, by hand:** put a red line near each tempo change, select one, then

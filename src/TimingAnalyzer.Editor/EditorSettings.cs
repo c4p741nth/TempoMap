@@ -22,6 +22,8 @@ public sealed record EditorSettings
     /// <summary>Auto-time's lines on the waveform's leading edge; its first red line on a bar's first beat (docs E43).</summary>
     public bool AlignToEdge { get; init; } = true;
     public bool StartOnBar { get; init; } = true;
+    /// <summary>Fixed conversion value. Legacy JSON values are ignored because this property has no setter.</summary>
+    public int OsuCopyShiftMs => OsuTimingExport.ShiftMs;
     public string AutoMode { get; init; } = EditorViewModel.NormalMode;
     public int TableTab { get; init; }
     public double WindowWidth { get; init; } = 1280;

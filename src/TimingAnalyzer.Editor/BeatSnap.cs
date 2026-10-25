@@ -21,6 +21,7 @@ public static class BeatSnap
         if (!Divisors.Contains(divisor)) throw new ArgumentOutOfRangeException(nameof(divisor));
         if (!double.IsFinite(positionMs) || direction == 0) throw new ArgumentOutOfRangeException(nameof(positionMs));
         if (reds.Count == 0) return positionMs;
+        reds = BeatGrid.Effective(reds);
         return direction > 0 ? Next(reds, positionMs + Tolerance, divisor) : Previous(reds, positionMs - Tolerance, divisor);
     }
 

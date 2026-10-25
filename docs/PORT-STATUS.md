@@ -28,12 +28,33 @@ Status values: `todo`, `in-progress`, `done`, `blocked`.
 
 ## Last stop
 
-- When: 2026-10-16
+E49 (2026-10-25): rebuilt E48 into the standard Release path after confirming the user closed the old App.
+App build 0 warnings/errors; App/Editor SHA256 match the verified E48 preview. C# 282/282 pass.
+Removed 8 generated duplicate-output targets, 457 files, 998,587,067 logical bytes; no tracked files,
+workspace escapes or reparse points. Normal exe/model/native DLLs verified after cleanup.
+
+- When: 2026-10-25
 - Who (executor/model): Codex
-- Stopped because: All port tasks are done; no early-stop condition occurred.
-- Working tree state (uncommitted changes, failing tests): All verified task work committed; no failing tests. No push.
-- Next step: None for this plan. Golden data can be regenerated with the README commands.
+- Status/commit: T1-T6 remain done; E45-E49 uncommitted on base 821a2f6 as previously requested.
+- Stopped because: normal rebuild and cleanup complete. No product-code, engine, package or version changes.
+- Next step: `src/TimingAnalyzer.App/bin/Release/net10.0/win-x64/Tempomap.exe`.
+  Preview/scratch compiled copies are removed; validation sources/results remain. E48 UI checks remain 132 + 81
+  (not rerun for this cleanup). Manual listening/acceptance and portable FFmpeg packaging remain separate.
+  No git mutation or network git action. Evidence: `.dotnet-home/e49-rebuild/`.
 
 ## Phase 1 editor follow-up
 
+E45 recording follow-up: `osu_audio_calibration.py` now matches the known reference waveform so tick residue at
+the song's edges cannot count as music. Its regression was observed failing before the fix; Python 9/9 now pass.
+The real recording and remaining control are in docs/OSU-AUDIO-TIMING.md. No C#/Core/decoder changes in this follow-up.
+
+E45 (2026-10-25, base 821a2f6; task commit pending user approval): added calibrated Copy to osu! and synthetic
+stereo audio calibration tooling, documented the DLL decode/output comparisons and the unmeasured stable-session
+residual. Core/reference/reverse and package versions are unchanged. Release build: 0 warnings/errors;
+Editor 225/225, Core 41/41; Python 8/8; headless MainWindow clicks/clipboard 40 checks. Disabling the copy shift
+failed 7 of 12 focused cases; exact source restoration was hash-checked, followed by the final green checks.
+Actual osu! editor capture/listening remains on the manual checklist. No fixed offset preset was introduced.
+
 E1-E12 are implemented and verified; see docs/PHASE1-STATUS.md for task commits and validation (E10 c4bc132; E11 0ce8221; E12 555955b). Core, reference and reverse remain unchanged. Latest Release check used normal output paths: 0 warnings/errors; Core 7/7, Editor 83/83, 90 total, no failures/skips. E12 adds smooth follow with a one-third anchor, pure interpolation and tested navigation suspension; its disabled-guard negative control failed all 3 navigation cases before exact restoration and full green checks. Manual editor/audio/osu! acceptance remains; see docs/EDITOR-MANUAL-TEST.md.
+
+E45 clarification: for the user's local copy-and-listen workflow, recommend Copy shift -33 ms (1000 -> 967), selected from the actual captures; no more recording needed to choose a usable setting. Shift 0 preserves source timing and was a different objective. The -36 trial was worse in the provided controls. No setting or source timing is changed automatically; variable tick timing remains.
