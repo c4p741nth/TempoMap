@@ -115,8 +115,9 @@ public class ViewModelTests
                 "1000,400,4,2,0,100,1,0\r\n1000,400,4,2,0,100,1,0\r\n[HitObjects]\r\n");
             using var vm = new EditorViewModel(_ => throw new InvalidOperationException("Must not decode missing audio"), _ => new FakePlayback());
             await vm.LoadAsync(path);
-            Assert.Equal([0, 1000], vm.Edits.RedLines.Select(p => p.Time));
-            Assert.Contains("1 duplicate red line", vm.Status, StringComparison.Ordinal);
+            Assert.Equal([0, 1000, 1000], vm.Edits.RedLines.Select(p => p.Time));
+            Assert.Contains("1 overlapping red line", vm.Status, StringComparison.Ordinal);
+            Assert.Equal(2, vm.TimingRows.Count(r => r.Overlaps));
             Assert.DoesNotContain("Open failed", vm.Status, StringComparison.Ordinal);
         }
         finally { File.Delete(path); }

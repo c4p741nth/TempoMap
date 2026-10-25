@@ -1,0 +1,229 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+          <SolidColorBrush x:Key="WorkspaceCanvas">#0C141D</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceSurface">#15212E</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceInset">#1C2B3A</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceHover">#2A3D4D</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceChrome">#111D29</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceText">#E8F0F6</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceMuted">#A1B3C4</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceEdge">#304455</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceAccent">#54D6BD</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceAccentHover">#7DE4CE</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceAccentInk">#092A24</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceAccentSoft">#1C403F</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceSelection">#254A49</SolidColorBrush>
+          <SolidColorBrush x:Key="TimingRedBrush">#F2787A</SolidColorBrush>
+          <SolidColorBrush x:Key="TimingGreenBrush">#64CA87</SolidColorBrush>
+          <SolidColorBrush x:Key="TimingOverlapBrush">#FFB347</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformBackgroundBrush">#101B26</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformSignalBrush">#48BCB4</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformSubdivisionBrush">#263746</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformBeatBrush">#455B70</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformMeasureBrush">#9A87BA</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformRedBrush">#E46D72</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformPlayheadBrush">#F3C653</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformSelectedBrush">#FF9365</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayLabelBrush">#7F92A5</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayGhostBrush">#3FD4E8</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayGhostBeatBrush">#4C7C8C</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayOnsetBrush">#FFA94D</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayKiaiBrush">#64DC9614</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayBookmarkBrush">#E08AE0</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayRangeBrush">#78AAFF</SolidColorBrush>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+          <SolidColorBrush x:Key="WorkspaceCanvas">#EDF2F6</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceSurface">#FFFFFF</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceInset">#F3F7FA</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceHover">#E5EEF3</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceChrome">#FFFFFF</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceText">#1C3040</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceMuted">#536B7D</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceEdge">#CEDCE5</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceAccent">#087D78</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceAccentHover">#056862</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceAccentInk">#FFFFFF</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceAccentSoft">#E0F3EE</SolidColorBrush>
+          <SolidColorBrush x:Key="WorkspaceSelection">#DDF1EA</SolidColorBrush>
+          <SolidColorBrush x:Key="TimingRedBrush">#C23D45</SolidColorBrush>
+          <SolidColorBrush x:Key="TimingGreenBrush">#23834B</SolidColorBrush>
+          <SolidColorBrush x:Key="TimingOverlapBrush">#A65A00</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformBackgroundBrush">#F8FBFD</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformSignalBrush">#178B87</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformSubdivisionBrush">#DFE8EF</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformBeatBrush">#AEC1CF</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformMeasureBrush">#8C77B4</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformRedBrush">#C84B54</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformPlayheadBrush">#A86C00</SolidColorBrush>
+          <SolidColorBrush x:Key="WaveformSelectedBrush">#C44E20</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayLabelBrush">#5E7384</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayGhostBrush">#0A7FA0</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayGhostBeatBrush">#6FA3B5</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayOnsetBrush">#C46A00</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayKiaiBrush">#66B87A00</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayBookmarkBrush">#9B3FA0</SolidColorBrush>
+          <SolidColorBrush x:Key="OverlayRangeBrush">#3B6FD0</SolidColorBrush>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+    </ResourceDictionary>
+  </Styles.Resources>
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceCanvas}" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceText}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="Border.surface, Border.toolGroup">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
+    <Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="10" />
+  </Style>
+  <Style Selector="Border.inset">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="CornerRadius" Value="8" /><Setter Property="Padding" Value="10" />
+  </Style>
+  <Style Selector="TextBlock.caption">
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceMuted}" />
+    <Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.section">
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceMuted}" />
+    <Setter Property="FontWeight" Value="SemiBold" /><Setter Property="Margin" Value="0,8,0,2" />
+  </Style>
+  <!-- One control height (28 px) for buttons, boxes and drop-downs in every window: Fluent's 32 px drop-downs looked heavier than the labels beside them. -->
+  <Style Selector="Button, RepeatButton">
+    <Setter Property="Padding" Value="10,3" /><Setter Property="MinHeight" Value="28" />
+  </Style>
+  <Style Selector="ComboBox">
+    <Setter Property="MinHeight" Value="28" /><Setter Property="Padding" Value="8,2,4,2" />
+  </Style>
+  <Style Selector="TextBox">
+    <Setter Property="MinHeight" Value="28" /><Setter Property="Padding" Value="6,4" />
+  </Style>
+  <Style Selector="Button, RepeatButton">
+    <Setter Property="CornerRadius" Value="6" /><Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceText}" />
+  </Style>
+  <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter, RepeatButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceAccent}" />
+  </Style>
+  <Style Selector="Button.primary">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceAccent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceAccent}" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceAccentInk}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceAccentHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceAccentHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceAccentInk}" />
+  </Style>
+  <Style Selector="Button.danger">
+    <Setter Property="Foreground" Value="{DynamicResource TimingRedBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource TimingRedBrush}" />
+  </Style>
+  <Style Selector="TextBox, ComboBox, NumericUpDown">
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceText}" />
+  </Style>
+  <Style Selector="NumericUpDown">
+    <Setter Property="MinHeight" Value="28" />
+  </Style>
+  <!-- Lists: a frame so an empty list still reads as one, and a selection colour that keeps the text legible in both themes. -->
+  <Style Selector="ListBox">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
+    <Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="8" /><Setter Property="Padding" Value="2" />
+  </Style>
+  <Style Selector="ListBox ListBoxItem:selected /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceSelection}" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceText}" />
+  </Style>
+  <!-- Fluent's horizontal slider is 50 px tall (the thumb and track sit in the middle of reserved tick rows), which made the playback card 22 px
+       taller than the Auto-time and Shift cards. A negative margin gives back the empty rows: it draws as before but takes 28 px of layout, the
+       height of a button. (Setting Height = 28 cut the thumb in half.) -->
+  <Style Selector="Slider:horizontal">
+    <Setter Property="Margin" Value="0,-11" />
+  </Style>
+  <!-- Expanders (Timing tools): Fluent's own header is near-black and its content grey in Dark, white and grey in Light. -->
+  <Style Selector="Expander">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+  <Style Selector="Expander /template/ ToggleButton#ExpanderHeader">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceText}" />
+  </Style>
+  <Style Selector="Expander /template/ Border#ExpanderContent">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" />
+  </Style>
+  <!-- Splitters: no bar at rest; a soft accent while the pointer is over, the accent itself while dragging. The resize cursor stays. -->
+  <Style Selector="GridSplitter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="GridSplitter:pointerover">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceAccentSoft}" />
+  </Style>
+  <Style Selector="GridSplitter:pressed">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceAccent}" />
+  </Style>
+  <Style Selector="TextBlock.title">
+    <Setter Property="FontSize" Value="16" /><Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.hint">
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceMuted}" /><Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="TextBlock.error">
+    <Setter Property="Foreground" Value="{DynamicResource TimingRedBrush}" />
+  </Style>
+  <Style Selector="Border.chip">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceInset}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource WorkspaceEdge}" /><Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="5" /><Setter Property="Padding" Value="7,2" />
+  </Style>
+  <Style Selector="Menu">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="MenuItem">
+    <Setter Property="CornerRadius" Value="5" />
+  </Style>
+  <Style Selector="ListBox.timing">
+    <Setter Property="Background" Value="Transparent" /><Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="ListBox.timing ListBoxItem">
+    <Setter Property="CornerRadius" Value="5" /><Setter Property="Margin" Value="0,1" />
+  </Style>
+  <Style Selector="ListBox.timing ListBoxItem:selected /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource WorkspaceSelection}" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceText}" />
+  </Style>
+  <!-- Tab titles of the timing table and of the tool windows: compact, muted until selected (Fluent's idle tab is near-invisible in Light). -->
+  <Style Selector="TabStripItem, TabItem">
+    <Setter Property="FontSize" Value="13" /><Setter Property="MinHeight" Value="28" /><Setter Property="Padding" Value="10,3" />
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceMuted}" />
+  </Style>
+  <Style Selector="TabStripItem:selected, TabItem:selected">
+    <Setter Property="Foreground" Value="{DynamicResource WorkspaceAccent}" />
+  </Style>
+  <Style Selector="TextBlock.pointMarker">
+    <Setter Property="Foreground" Value="{DynamicResource TimingRedBrush}" />
+  </Style>
+  <Style Selector="TextBlock.pointMarker.green">
+    <Setter Property="Foreground" Value="{DynamicResource TimingGreenBrush}" />
+  </Style>
+  <Style Selector="TextBlock.pointMarker.overlap">
+    <Setter Property="Foreground" Value="{DynamicResource TimingOverlapBrush}" />
+  </Style>
+</Styles>

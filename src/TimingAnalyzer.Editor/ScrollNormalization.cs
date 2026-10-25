@@ -11,6 +11,8 @@ public static class ScrollNormalization
 {
     /// <summary>Slider velocity range written (osu!mania green lines go from 0.01x to 10x).</summary>
     public const double MinSv = 0.01, MaxSv = 10;
+    // Use the same unit snap in both directions when converting visible SVs to stored effects.
+    internal static double ExactUnit(double sv) => Math.Abs(sv - 1) < 1e-5 ? 1 : sv;
 
     /// <param name="Points">Every red line and the green lines, ready for <see cref="TimingClipboard.Write"/>.</param>
     /// <param name="MainBpm">The BPM the scroll speed is normalised to.</param>
@@ -21,19 +23,20 @@ public static class ScrollNormalization
     public sealed record Result(TimingPoint[] Points, double MainBpm, double? Reference, int Added, int Scaled, int Clamped);
 
     /// <summary>
-    /// osu!'s main beat length, as lazer's <c>Beatmap.GetMostCommonBeatLength</c> (kept to match stable's osu!mania
-    /// scroll speed): the beat length (to 3 decimals) held longest, the first red line counted from 0 and the last
-    /// up to <paramref name="lastTime"/>, the end of the last note; a red line after it counts nothing. Ties go to the
-    /// first beat length in time.
+    /// The beat length (to 3 decimals) held longest over [0, lastTime]. The live editor supplies the whole audio's
+    /// duration, as requested; callers comparing osu!'s main BPM can supply the last note's end instead.
+    /// The first red line counts from 0; lines after the supplied end count nothing. Ties go to the first in time.
     /// </summary>
     public static double MainBeatLength(IReadOnlyList<TimingPoint> reds, double lastTime)
     {
         if (reds.Count == 0) throw new ArgumentException("No red lines.", nameof(reds));
+        reds = BeatGrid.Effective(reds);
         var totals = new List<(double BeatLength, double Duration)>();
         for (int i = 0; i < reds.Count; i++)
         {
             double time = reds[i].SerializedTime;
-            double duration = time > lastTime ? 0 : (i + 1 == reds.Count ? lastTime : reds[i + 1].SerializedTime) - (i == 0 ? 0 : time);
+            double duration = Math.Max(0, Math.Min(lastTime, i + 1 == reds.Count ? lastTime : reds[i + 1].SerializedTime) -
+                Math.Max(0, i == 0 ? 0 : time));
             double key = Math.Round(reds[i].BeatLength * 1000) / 1000;
             int at = totals.FindIndex(t => t.BeatLength == key);
             if (at < 0) totals.Add((key, duration));
@@ -68,13 +71,13 @@ public static class ScrollNormalization
     /// written for) are divided by that first, so normalising twice changes nothing.
     /// </summary>
     public static Result Normalize(IReadOnlyList<TimingPoint> reds, IReadOnlyList<TimingPoint> greens,
-        IReadOnlyList<TimingPoint> authoredReds, double lastTime)
+        IReadOnlyList<TimingPoint> authoredReds, double lastTime, bool includeUnitLines = false, bool detectExisting = true)
     {
         reds = BeatGrid.Sort(reds);
         var authored = authoredReds.Count > 0 ? BeatGrid.Sort(authoredReds) : reds;
         var green = greens.Where(g => !g.Uninherited).OrderBy(g => g.Time).ToArray();
         double main = MainBeatLength(reds, lastTime);
-        double? reference = ExistingReference(authored, green);
+        double? reference = detectExisting ? ExistingReference(authored, green) : null;
         int added = 0, scaled = 0, clamped = 0;
         double Clamp(double sv)
         {
@@ -84,9 +87,8 @@ public static class ScrollNormalization
         }
         // Within 0.001 % of 1 is 1: 116.959 BPM (513.0002 ms) against a main beat of 513 ms needs no green line, and
         // a green line that is already right keeps its text.
-        static double Exact(double sv) => Math.Abs(sv - 1) < 1e-5 ? 1 : sv;
-        double Factor(TimingPoint red) => Exact(red.BeatLength / main);
-        double Own(TimingPoint g) => reference is { } r ? Exact(g.Sv * RedAt(authored, g.Time).Bpm / r) : g.Sv;
+        double Factor(TimingPoint red) => ExactUnit(red.BeatLength / main);
+        double Own(TimingPoint g) => reference is { } r ? ExactUnit(g.Sv * RedAt(authored, g.Time).Bpm / r) : g.Sv;
         var output = new List<TimingPoint>(reds);
         foreach (var g in green)
         {
@@ -95,10 +97,10 @@ public static class ScrollNormalization
             scaled++;
             output.Add(g with { BeatLength = -100 / sv });
         }
-        foreach (var red in reds)
+        foreach (var red in reds.GroupBy(r => r.SerializedTime).Select(g => g.First()))
         {
             double sv = Factor(red);
-            if (GreenAt(green, red) is not null || sv == 1) continue;
+            if (GreenAt(green, red) is not null || sv == 1 && !includeUnitLines) continue;
             output.Add(new TimingPoint(red.SerializedTime, -100 / Clamp(sv), red.Meter, red.SampleSet, red.SampleIndex,
                 red.Volume, false, red.Effects & TimingPoint.Kiai));
             added++;

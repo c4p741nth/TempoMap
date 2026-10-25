@@ -1,12 +1,10 @@
 name: CI
 
-# Every pull request into develop or main, and every push to develop: build, test, and (for a pull request into main,
-# the one that will release) make sure the release zip can be built. Nothing is published here.
+# Pull requests into develop/main build and test the merge result. PRs into main also check packaging.
+# There is no develop push run: an open develop -> main PR already covers that update. Nothing is published here.
 on:
   pull_request:
     branches: [develop, main]
-  push:
-    branches: [develop]
 
 permissions:
   contents: read
@@ -24,7 +22,9 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          # Exact version on purpose: 10.0.x makes dotnet-install resolve through aka.ms, which redirects to
+          # dotnetorigin.blob.core.windows.net (HTTP 409 since 2026-10-25). An exact version uses builds.dotnet.microsoft.com.
+          dotnet-version: 10.0.403
 
       - name: Restore
         run: dotnet restore
@@ -48,7 +48,9 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          # Exact version on purpose: 10.0.x makes dotnet-install resolve through aka.ms, which redirects to
+          # dotnetorigin.blob.core.windows.net (HTTP 409 since 2026-10-25). An exact version uses builds.dotnet.microsoft.com.
+          dotnet-version: 10.0.403
 
       - name: Package
         id: package

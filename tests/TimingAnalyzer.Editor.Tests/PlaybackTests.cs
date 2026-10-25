@@ -67,6 +67,7 @@ public class PlaybackTests
     [InlineData(1.0)]
     [InlineData(0.75)]
     [InlineData(0.5)]
+    [InlineData(0.25)]
     public void DeviceLatencyUsesSourceSpeedAndClampsToSeek(double speed)
     {
         Assert.Equal(speed, PlaybackMath.ValidateSpeed(speed));

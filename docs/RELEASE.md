@@ -10,7 +10,7 @@ feature branch ──PR──▶ develop ──PR──▶ main ──(release.y
 ```
 
 1. **Work on a branch, open a pull request into `develop`.** `ci.yml` builds and tests it (Windows runner, .NET 10).
-2. **Merge into `develop`.** CI runs again on the push.
+2. **Merge into `develop`.** No extra push CI runs. An open `develop` -> `main` pull request tests the updated merge result.
 3. **When `develop` is ready to release, bump the version in a commit on `develop`:** `Version` (`2026.10.23.0`) and
    `InformationalVersion` (`20261023.0`) in `src/TimingAnalyzer.App/TimingAnalyzer.App.csproj`, which must say the same
    date and number (`YYYYMMDD.n`, the n-th release that day; `Version` has no leading zeros). The tag is `v` + the
@@ -26,22 +26,39 @@ feature branch ──PR──▶ develop ──PR──▶ main ──(release.y
 A push to `main` whose version already has a release, a draft or a tag builds nothing: the run only says
 "raise Version and InformationalVersion to release again". So a docs-only merge into `main` is harmless.
 
+## Which checks run
+
+| Event | Build and test | Package preview |
+| --- | --- | --- |
+| PR into develop | Runs | Skipped |
+| PR into main | Runs on the merge result | Runs after tests |
+| Push to develop | No CI run | No CI run |
+
+The old configuration also ran CI on each develop push. With a develop -> main PR open, that produced both
+`build-test (push)` and `build-test (pull_request)` for the same update. The push trigger has been removed.
+Keep the main PR check: GitHub checks the proposed merge with main, not just the develop branch in isolation.
+See [GitHub's pull_request event documentation](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request).
+
+Skipped jobs still appear as checks; `package (pull_request)` on a develop PR does not execute packaging.
+Dependabot config validation is a separate GitHub check. The number of check rows is not the number of builds.
+The separate Release workflow still validates and packages the actual main commit before creating its draft;
+its artifact and attestation must describe that commit. Existing draft/version safeguards stay in place.
+
 ## What the packaging script does
 
 `pwsh tools/package-release.ps1` (PowerShell 7; the same file runs on a clone and in Actions):
 
 - publishes the App self-contained for win-x64 into `artifacts/` (git-ignored), building in `artifacts/build` so a
-  Tempomap running from `src/.../bin` cannot hold a file the build needs;
+  TempoMap running from `src/.../bin` cannot hold a file the build needs;
 - takes out `.pdb` and `.lib` files and the ffmpeg libraries `ppy.osu.Framework.NativeLibs` brings along (unused, LGPL;
   `av_libglesv2.dll` is ANGLE's GL library and stays);
 - adds `README.txt` (from `tools/release/README.template.txt`, `{version}` filled in) and `LICENSE.txt` (the repository's
   `LICENSE`);
-- checks the folder (Tempomap.exe, the BASS and ONNX Runtime libraries and `Models\beatnet.onnx` are there, nothing
+- checks the folder (TempoMap.exe, the BASS and ONNX Runtime libraries and `Models\beatnet.onnx` are there, nothing
   unwanted is, the exe's ProductVersion is the InformationalVersion) and fails if not;
-- zips it as `Tempomap-v<version>-win-x64.zip` with a folder of that name inside, and writes `<zip>.sha256`.
+- zips it as `TempoMap-v<version>-win-x64.zip` with a folder of that name inside, and writes `<zip>.sha256`.
 
-The first run of this script reproduced the file list of the hand-made `Tempomap-v20261019.2-win-x64.zip` exactly
-(239 entries, 58.5 MB). Change what a release carries in the script and its README template, not by hand.
+Change what a release carries in the script and its README template, not by hand.
 
 ## One-time setup on GitHub
 
@@ -54,7 +71,7 @@ The first run of this script reproduced the file list of the hand-made `Tempomap
   `develop`.
 - **Default branch:** `main`, so the repository page shows what was released.
 - **Attestations** exist for public repositories on every plan; the workflow skips that step in a private one.
-  Anyone can then check a downloaded zip with `gh attestation verify Tempomap-v<version>-win-x64.zip --repo <owner>/<repo>`.
+  Anyone can then check a downloaded zip with `gh attestation verify TempoMap-v<version>-win-x64.zip --repo <owner>/<repo>`.
 
 ## If something goes wrong
 

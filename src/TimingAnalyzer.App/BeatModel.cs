@@ -1,6 +1,7 @@
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using TimingAnalyzer.Core;
+using TimingAnalyzer.Editor;
 
 namespace TimingAnalyzer.App;
 
@@ -18,7 +19,7 @@ public sealed class BeatModel : IDisposable
     {
         // No CPU memory arena: it kept ~330 MB of activation buffers after a 5-minute song; without it each chunk's
         // buffers are freed after its run (same outputs, about the same speed).
-        var options = new SessionOptions { IntraOpNumThreads = Math.Max(1, Environment.ProcessorCount / 2), EnableCpuMemArena = false };
+        using var options = new SessionOptions { IntraOpNumThreads = Math.Max(1, Environment.ProcessorCount / 2), EnableCpuMemArena = false };
         // Idle worker threads sleep instead of spinning, so the UI thread keeps its frames while the model runs.
         options.AddSessionConfigEntry("session.intra_op.allow_spinning", "0");
         session = new InferenceSession(path, options);
@@ -40,13 +41,15 @@ public sealed class BeatModel : IDisposable
     /// Both heads of the model, per 10 ms frame: the beat probability and the downbeat probability (where mappers start
     /// a bar; <see cref="BarStart"/> uses it to put the first red line on a bar's first beat).
     /// </summary>
-    public (float[] Beat, float[] Downbeat) Activations(double[] mono, double rate)
+    public (float[] Beat, float[] Downbeat) Activations(double[] mono, double rate, CancellationToken cancellationToken = default, IProgress<AnalysisProgress>? progress = null)
     {
         var mel = BeatMel.Compute(BeatMel.Resample(mono, rate), out int frames);
         var beat = new float[frames];
         var downbeat = new float[frames];
         for (int start = 0; start < frames; start += ChunkFrames)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new("Running beat model", 100.0 * start / Math.Max(1, frames)));
             int from = Math.Max(0, start - Overlap), to = Math.Min(frames, start + ChunkFrames + Overlap);
             var input = new DenseTensor<float>(new[] { 1, to - from, BeatMel.Mels });
             mel.AsSpan(from * BeatMel.Mels, (to - from) * BeatMel.Mels).CopyTo(input.Buffer.Span);

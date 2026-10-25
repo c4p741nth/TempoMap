@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-  Builds the Tempomap release zip: the same steps on a clone and in GitHub Actions (docs/RELEASE.md).
+  Builds the TempoMap release zip: the same steps on a clone and in GitHub Actions (docs/RELEASE.md).
 
 .DESCRIPTION
   Publishes the App self-contained for win-x64, takes out what a release must not carry (.pdb and .lib files and the
   ffmpeg libraries ppy.osu.Framework.NativeLibs brings along: unused, LGPL), adds README.txt (from
-  tools/release/README.template.txt) and LICENSE.txt, checks the result, zips it as Tempomap-v<version>-win-x64.zip with
+  tools/release/README.template.txt) and LICENSE.txt, checks the result, zips it as TempoMap-v<version>-win-x64.zip with
   the folder of that name inside, and writes the zip's SHA-256 beside it.
 
   The version is the App csproj's InformationalVersion (YYYYMMDD.n); Version must say the same date and number
@@ -38,7 +38,7 @@ if ($version -ne $expected) {
     throw "Version '$version' does not match InformationalVersion '$info' (it should be '$expected'); change both in $project"
 }
 $tag = "v$info"
-$name = "Tempomap-$tag-win-x64"
+$name = "TempoMap-$tag-win-x64"
 
 # ---- publish -----------------------------------------------------------------------------------------------------
 $OutputDirectory = [System.IO.Path]::GetFullPath($OutputDirectory)
@@ -50,7 +50,7 @@ if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
 New-Item -ItemType Directory -Path $staging -Force | Out-Null
 
 Write-Host "Publishing $name ..."
-# The build goes to its own folder (BaseOutputPath), so a Tempomap running from src/.../bin cannot hold a file this build needs.
+# The build goes to its own folder (BaseOutputPath), so a TempoMap running from src/.../bin cannot hold a file this build needs.
 $build = (Join-Path $OutputDirectory 'build') + [System.IO.Path]::DirectorySeparatorChar
 dotnet publish $project -c Release -r win-x64 --self-contained true -p:DebugType=None -p:DebugSymbols=false "-p:BaseOutputPath=$build" -o $staging
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed ($LASTEXITCODE)" }
@@ -72,7 +72,7 @@ Copy-Item -LiteralPath (Join-Path $root 'LICENSE') -Destination (Join-Path $stag
 
 # ---- check the folder before it is zipped -----------------------------------------------------------------------
 $problems = @()
-foreach ($required in 'Tempomap.exe', 'Tempomap.dll', 'README.txt', 'LICENSE.txt', 'bass.dll', 'bass_fx.dll', 'bassmix.dll',
+foreach ($required in 'TempoMap.exe', 'TempoMap.dll', 'README.txt', 'LICENSE.txt', 'bass.dll', 'bass_fx.dll', 'bassmix.dll',
                       'onnxruntime.dll', 'Microsoft.ML.OnnxRuntime.dll', (Join-Path 'Models' 'beatnet.onnx')) {
     if (-not (Test-Path -LiteralPath (Join-Path $staging $required))) { $problems += "missing $required" }
 }
@@ -80,10 +80,10 @@ foreach ($file in Get-ChildItem -LiteralPath $staging -Recurse -File) {
     if ($file.Extension -in '.pdb', '.lib') { $problems += "unwanted $($file.Name)" }
     foreach ($pattern in $ffmpeg) { if ($file.Name -like $pattern) { $problems += "ffmpeg library $($file.Name)" } }
 }
-$exe = Join-Path $staging 'Tempomap.exe'
+$exe = Join-Path $staging 'TempoMap.exe'
 if (Test-Path -LiteralPath $exe) {
     $product = (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion
-    if (-not $product.StartsWith($info)) { $problems += "Tempomap.exe says version '$product', expected '$info'" }
+    if (-not $product.StartsWith($info)) { $problems += "TempoMap.exe says version '$product', expected '$info'" }
 }
 if ($problems.Count -gt 0) { throw ("The release folder is not right:`n  " + ($problems -join "`n  ")) }
 

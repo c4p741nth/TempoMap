@@ -3,6 +3,12 @@
              x:Class="TimingAnalyzer.App.App"
              RequestedThemeVariant="Dark">
   <Application.Styles>
-    <FluentTheme />
+    <FluentTheme DensityStyle="Compact">
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Dark" Accent="#54D6BD" />
+        <ColorPaletteResources x:Key="Light" Accent="#087D78" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
+    <StyleInclude Source="/Styles/Workspace.axaml" />
   </Application.Styles>
 </Application>

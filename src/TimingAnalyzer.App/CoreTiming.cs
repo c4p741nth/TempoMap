@@ -9,9 +9,15 @@ namespace TimingAnalyzer.App;
 /// exactly what <see cref="Analyzer.Analyze"/> runs, without its 10-minute cap: the original exe's FFT table held
 /// 2²⁰ points, while Core's <see cref="Fft"/> sizes itself to the song.
 /// </summary>
-public sealed class CoreTiming
+public sealed class CoreTiming : IDisposable
 {
-    private AudioContent? source;
+    public CancellationToken CancellationToken { get; set; }
+    public IProgress<AnalysisProgress>? Progress { get; set; }
+    private void Stage(string name) { CancellationToken.ThrowIfCancellationRequested(); Progress?.Report(new(name)); }
+    private WeakReference<AudioContent>? source;
+    private int? detectionStatus;
+    private bool hasDetectionStatus;
+    private readonly Dictionary<(int From, int To), float[]> rangeHeads = new();
     private double[] envelope = [];
     private double[]? rise;
     private double? lag;
@@ -41,16 +47,18 @@ public sealed class CoreTiming
 
     private void Load(AudioContent audio)
     {
-        if (ReferenceEquals(audio, source)) return;
-        envelope = OnsetEnvelope.Compute(audio.Mono, audio.Rate);
-        source = audio; rise = null; lag = null; heads = null;
+        if (source is not null && source.TryGetTarget(out var cached) && ReferenceEquals(audio, cached)) return;
+        Stage("Computing onset envelope");
+        envelope = OnsetEnvelope.Compute(audio.Mono, audio.Rate, cancellationToken: CancellationToken, progress: value => Progress?.Report(new("Computing onset envelope", value)));
+        source = new(audio); rise = null; lag = null; heads = null;
+        detectionStatus = null; hasDetectionStatus = false; rangeHeads.Clear();
     }
 
     /// <summary>The beat model's beat and downbeat activations for this song, run once; null without the model file.</summary>
     private (float[] Beat, float[] Downbeat)? Heads(AudioContent audio)
     {
         Load(audio);
-        if (heads is null && Model() is { } model) heads = model.Activations(audio.Mono, audio.Rate);
+        if (heads is null && Model() is { } model) { Stage("Running beat model"); heads = model.Activations(audio.Mono, audio.Rate, CancellationToken, Progress); }
         return heads;
     }
 
@@ -90,7 +98,9 @@ public sealed class CoreTiming
         bool whole = request.StartMs <= 0 && request.EndMs >= audio.DurationMs;
         int a = whole ? 0 : Math.Clamp((int)Math.Floor(request.StartMs), 0, envelope.Length);
         int b = whole ? envelope.Length : Math.Clamp((int)Math.Ceiling(request.EndMs), a, envelope.Length);
+        Stage("Fitting BPM and offset");
         var result = Analyzer.AnalyzeEnvelope(whole ? envelope : envelope[a..b], request.Bpm ?? 0);
+        if (whole && request.Bpm is null) { detectionStatus = result.Status; hasDetectionStatus = true; }
         // Core offsets are relative to the analyzed slice. With a BPM (locked, or detected exactly) the beat model gives the phase.
         double? offset = result.Offset + a;
         if (offset is not null && result.Bpm is { } bpm) offset = ModelPhase(audio, bpm, a, whole ? audio.DurationMs : b, offset);
@@ -101,6 +111,7 @@ public sealed class CoreTiming
     public MultiTimingDetection DetectMulti(AudioContent audio)
     {
         Load(audio);
+        Stage("Finding tempo sections");
         var (sections, beats) = MultiBpmAnalyzer.AnalyzeWithBeats(envelope);
         double lagMs = LagMs(audio);
         float[]? downbeat = null;
@@ -112,7 +123,7 @@ public sealed class CoreTiming
             downbeat = down;
             var modelLines = BeatModelTiming.Lines(BeatModelTiming.Beats(beat));
             if (BeatModelTiming.PreferModel(envelope, OsuSections(sections), OsuSections(modelLines), audio.DurationMs))
-                return new(modelLines.Select(s => Shifted(s, lagMs)).ToList(), null, Analyzer.AnalyzeEnvelope(envelope).Status,
+                return new(modelLines.Select(s => Shifted(s, lagMs)).ToList(), null, DetectionStatus(),
                     null, BeatModelUsed: true, Note: EdgeNote(lagMs));
         }
         if (sections.Count == 0) return new([], "cannot determine timing");
@@ -150,20 +161,41 @@ public sealed class CoreTiming
             }
         }
         var wobble = DrumWobble.Measure(audio.Mono, audio.Rate, beats);
-        return new(lines.Select(s => Shifted(s, lagMs)).ToList(), null, Analyzer.AnalyzeEnvelope(envelope).Status,
+        return new(lines.Select(s => Shifted(s, lagMs)).ToList(), null, DetectionStatus(),
             wobble is { SuggestsLiveDrums: true } ? new LiveDrumHint(wobble.MedianMs, wobble.Triples) : null, Note: barNote + EdgeNote(lagMs));
     }
 
     /// <summary>Beat model mode: the model's red lines for the whole song; an error when the model file is missing.</summary>
     public MultiTimingDetection DetectBeatModel(AudioContent audio)
     {
-        if (Model() is not { } model) return new([], "the beat model file (Models\\beatnet.onnx) is missing beside the exe");
-        var lines = BeatModelTiming.Lines(BeatModelTiming.Beats(model.BeatProbability(audio.Mono, audio.Rate)));
+        if (Heads(audio) is not { } h) return new([], "the beat model file (Models\\beatnet.onnx) is missing beside the exe");
+        var lines = BeatModelTiming.Lines(BeatModelTiming.Beats(h.Beat));
         double lagMs = LagMs(audio);
         return lines.Count == 0 ? new([], "the beat model found no beats") :
             new(lines.Select(s => Shifted(s, lagMs)).ToList(), BeatModelUsed: true, Note: EdgeNote(lagMs));
     }
 
+    public IReadOnlyList<BpmCandidate> Candidates(AudioContent audio)
+    {
+        Load(audio); Stage("Comparing BPM candidates");
+        var ac = Fft.Autocorrelate(envelope, Math.Min(envelope.Length / 2, 2001));
+        var peaks = Enumerable.Range(100, Math.Max(0, Math.Min(1000, ac.Length - 1) - 100))
+            .Where(i => ac[i] > 0 && ac[i] > ac[i - 1] && ac[i] >= ac[i + 1])
+            .OrderByDescending(i => ac[i]).Take(8).ToArray();
+        double best = peaks.Select(i => ac[i]).DefaultIfEmpty(1).Max();
+        return peaks.Select(i => new BpmCandidate(60000.0 / i, ac[i] / best)).ToArray();
+    }
+    private int? DetectionStatus()
+    {
+        if (!hasDetectionStatus) { detectionStatus = BpmDetector.Detect(envelope).Status; hasDetectionStatus = true; }
+        return detectionStatus;
+    }
+    public void ReleaseCache()
+    {
+        source = null; envelope = []; rise = null; heads = null; lag = null;
+        hasDetectionStatus = false; detectionStatus = null; rangeHeads.Clear();
+    }
+    public void Dispose() { ReleaseCache(); beatModel?.Dispose(); beatModel = null; modelTried = false; }
     private BeatModel? beatModel;
     private bool modelTried;
     private BeatModel? Model()
@@ -179,6 +211,7 @@ public sealed class CoreTiming
     public MultiTimingDetection DetectDrift(AudioContent audio, int beatsPerLine)
     {
         Load(audio);
+        Stage("Tracking drifting beats");
         var lines = DriftLines.Fit(envelope, beatsPerLine);
         if (lines.Count == 0) return new([], "cannot track beats");
         double lagMs = LagMs(audio);
@@ -211,11 +244,17 @@ public sealed class CoreTiming
     }
 
     // The model runs on the range plus 10 s each side (its context), then keeps the red lines that start inside.
-    private static IReadOnlyList<TimingSection> ModelRange(BeatModel model, AudioContent audio, int a, int b)
+    private IReadOnlyList<TimingSection> ModelRange(BeatModel model, AudioContent audio, int a, int b)
     {
         int from = Math.Max(0, a - 10000), to = Math.Min((int)audio.DurationMs, b + 10000);
         int s0 = (int)((long)from * audio.Rate / 1000), s1 = (int)Math.Min(audio.Mono.Length, (long)to * audio.Rate / 1000);
-        var beats = BeatModelTiming.Beats(model.BeatProbability(audio.Mono[s0..s1], audio.Rate)).Select(t => t + from).Where(t => t >= a && t < b).ToList();
+        if (!rangeHeads.TryGetValue((from, to), out var activations))
+        {
+            activations = from == 0 && s1 == audio.Mono.Length ? Heads(audio)!.Value.Beat : model.Activations(audio.Mono[s0..s1], audio.Rate, CancellationToken, Progress).Beat;
+            if (rangeHeads.Count >= 4) rangeHeads.Clear();
+            rangeHeads[(from, to)] = activations;
+        }
+        var beats = BeatModelTiming.Beats(activations).Select(t => t + from).Where(t => t >= a && t < b).ToList();
         return BeatModelTiming.Lines(beats);
     }
 

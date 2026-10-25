@@ -22,7 +22,7 @@ def write(name, title, title_unicode, artist, artist_unicode, version, mode, aud
         "SampleSet: Soft", "StackLeniency: 0.7", f"Mode: {mode}", "LetterboxInBreaks: 0", "WidescreenStoryboard: 1", "",
         "[Editor]", "DistanceSpacing: 1", "BeatDivisor: 4", "GridSize: 4", "TimelineZoom: 1", "",
         "[Metadata]", f"Title:{title}", f"TitleUnicode:{title_unicode}", f"Artist:{artist}", f"ArtistUnicode:{artist_unicode}",
-        "Creator:Tempomap tests", f"Version:{version}", "Source:", "Tags:synthetic fixture", "BeatmapID:0", "BeatmapSetID:-1", "",
+        "Creator:TempoMap tests", f"Version:{version}", "Source:", "Tags:synthetic fixture", "BeatmapID:0", "BeatmapSetID:-1", "",
         "[Difficulty]", "HPDrainRate:5", "CircleSize:4", "OverallDifficulty:7", "ApproachRate:9", "SliderMultiplier:1.4",
         "SliderTickRate:1", "",
         "[Events]", "//Background and Video events", "//Break Periods", *events,
@@ -59,7 +59,7 @@ for k in range(48):
     timing.append(red(round(t), bpm, effects=8 if k % 4 == 0 else 0))
     timing.append(green(round(t) + (0 if k % 2 == 0 else 1), [0.99, 0.97, 1.03, 1.0][k % 4]))
     t += (2 + k % 3) * 60000 / bpm
-write("steady-multi.osu", "Synthetic Steady", "シンセティック", "Tempomap Fixtures", "テンポマップ", "Many Red Lines", 0,
+write("steady-multi.osu", "Synthetic Steady", "シンセティック", "TempoMap Fixtures", "テンポマップ", "Many Red Lines", 0,
       "audio.mp3", timing, circles(range(1000, 90000, 353)), events=["2,40000,42000"])
 
 # ramp-mania.osu: osu!mania, 27 red lines, a ramp of 25 distinct BPMs and 178 green lines (as m1ll10n-pp.osu had).
@@ -69,10 +69,10 @@ for k, bpm in enumerate([234] + [215 + 8 * i for i in range(24)] + [234, 234]):
     for j in range(6 if k < 26 else 22):
         timing.append(green(round(t) + 37 * (j + 1), 0.8 + 0.05 * j, volume=65))
     t += (16 if k == 0 else 4) * 60000 / bpm
-write("ramp-mania.osu", "Synthetic Ramp", "合成ランプ", "Tempomap Fixtures", "テンポマップ", "Ramp", 3,
+write("ramp-mania.osu", "Synthetic Ramp", "合成ランプ", "TempoMap Fixtures", "テンポマップ", "Ramp", 3,
       "audio.ogg", timing, [f"{64 + 128 * (i % 4)},192,{2005 + 120 * i},1,0,0:0:0:0:" for i in range(800)])
 
 # one-red.osu: one red line, 12 green lines (as architecture.osu had).
 timing = [red(14460, 300, sample=1, index=0, volume=50)] + [green(14460 + 3200 * (j + 1), 1 + 0.1 * j, sample=1, index=0) for j in range(12)]
-write("one-red.osu", "Synthetic Single", "合成シングル", "Tempomap Fixtures", "テンポマップ", "One Red Line", 0,
+write("one-red.osu", "Synthetic Single", "合成シングル", "TempoMap Fixtures", "テンポマップ", "One Red Line", 0,
       "audio.mp3", timing, circles(range(14460, 120000, 200)))

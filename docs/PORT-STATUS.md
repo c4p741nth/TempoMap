@@ -28,12 +28,44 @@ Status values: `todo`, `in-progress`, `done`, `blocked`.
 
 ## Last stop
 
-- When: 2026-10-16
-- Who (executor/model): Codex
-- Stopped because: All port tasks are done; no early-stop condition occurred.
-- Working tree state (uncommitted changes, failing tests): All verified task work committed; no failing tests. No push.
-- Next step: None for this plan. Golden data can be regenerated with the README commands.
+F01–F18, A1/A2/A3 and all B/C are implemented and verified. A4/A5/A7 were explicitly excluded.
+**U1–U10 are all done.** The A6 deletion was run by the user on 2026-10-26; do not redo the features. Next: commit (user handles Git),
+then the listening/osu! acceptance checks.
+
+- When: 2026-10-26 · Codex · uncommitted on base 2777d9e. User handles Git; no state mutation/server calls.
+- E58 (same day, Claude Code): the user found the Shift beat/BPM/ms row missing from the main window (the controls lived only in F3 → Listening; who moved them is not recorded).
+  Restored it and brought the other frequent controls back; see PHASE1-STATUS.md E58 and docs/EDITOR-UPGRADE.md "Main-window controls".
+- E61 (same day): overview wave overflow, toolbar card heights, Shift scope box removed; see PHASE1-STATUS.md E61.
+- E60 (same day): startup prompt fix, overview/splitter, remembered layout; see PHASE1-STATUS.md E60.
+- E59 (same day): theme and dialog audit and redo; see PHASE1-STATUS.md E59 and docs/EDITOR-UPGRADE.md "Windows, dialogs and themes".
+- Normal executable: src/TimingAnalyzer.App/bin/Release/net10.0/win-x64/TempoMap.exe; version 20261023.0 unchanged.
+- Release solution 0 warnings/errors; C# 313 passed (Editor 271, Core 42), Python 10 passed.
+- MainWindow 131 checks at 1280x720/900x500 with 553 rows: input/remap/preferences, listening/display/review,
+  typed BPM locks, cancellation, recovery and Save .osu from the dirty guard. Normal DLLs match smoke output.
+- Native 11/12 extensions open/play/seek; Opus is unavailable and points to explicit conversion.
+  FLAC reported-length and WMA packet rounding/zero-seek boundaries corrected.
+- Envelope/autocorrelation SHA and full analysis match pre-change on 3 songs. Parallel bands were bit-identical
+  but slower on most inputs, so scalar arithmetic stays. Actual old-audio collection/full/range inference reuse verified.
+- Cleanup: 36 ignored targets/3741 files/3,335,745,202 bytes; no tracked/reparse files in checked scopes.
+  Codex's manifest and literal-path deletion were rejected: "blocked by policy". The user ran
+  .dotnet-home/editor-upgrade/cleanup-approved.ps1 (revalidates; supports -WhatIf) on 2026-10-26; afterwards 0/36 targets
+  exist and .eval-cache is gone. Kept: .dotnet-home/{.dotnet,.templateengine,editor-upgrade} (198 files, 7.3 MB).
+- Details: docs/EDITOR-UPGRADE.md; evidence .dotnet-home/editor-upgrade/validation.json, final-suite/, ui/final.log,
+  native/, cache/, perf/, artifact-hashes.json. Listening/osu! acceptance remains a user check.
 
 ## Phase 1 editor follow-up
 
+E45 recording follow-up: `osu_audio_calibration.py` now matches the known reference waveform so tick residue at
+the song's edges cannot count as music. Its regression was observed failing before the fix; Python 9/9 now pass.
+The real recording and remaining control are in docs/OSU-AUDIO-TIMING.md. No C#/Core/decoder changes in this follow-up.
+
+E45 (2026-10-25, base 821a2f6; task commit pending user approval): added calibrated Copy to osu! and synthetic
+stereo audio calibration tooling, documented the DLL decode/output comparisons and the unmeasured stable-session
+residual. Core/reference/reverse and package versions are unchanged. Release build: 0 warnings/errors;
+Editor 225/225, Core 41/41; Python 8/8; headless MainWindow clicks/clipboard 40 checks. Disabling the copy shift
+failed 7 of 12 focused cases; exact source restoration was hash-checked, followed by the final green checks.
+Actual osu! editor capture/listening remains on the manual checklist. No fixed offset preset was introduced.
+
 E1-E12 are implemented and verified; see docs/PHASE1-STATUS.md for task commits and validation (E10 c4bc132; E11 0ce8221; E12 555955b). Core, reference and reverse remain unchanged. Latest Release check used normal output paths: 0 warnings/errors; Core 7/7, Editor 83/83, 90 total, no failures/skips. E12 adds smooth follow with a one-third anchor, pure interpolation and tested navigation suspension; its disabled-guard negative control failed all 3 navigation cases before exact restoration and full green checks. Manual editor/audio/osu! acceptance remains; see docs/EDITOR-MANUAL-TEST.md.
+
+E45 clarification: for the user's local copy-and-listen workflow, recommend Copy shift -33 ms (1000 -> 967), selected from the actual captures; no more recording needed to choose a usable setting. Shift 0 preserves source timing and was a different objective. The -36 trial was worse in the provided controls. No setting or source timing is changed automatically; variable tick timing remains.

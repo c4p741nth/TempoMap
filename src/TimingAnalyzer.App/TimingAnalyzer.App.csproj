@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <RootNamespace>TimingAnalyzer.App</RootNamespace>
-    <AssemblyName>Tempomap</AssemblyName>
+    <AssemblyName>TempoMap</AssemblyName>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
@@ -17,11 +17,12 @@
     <InformationalVersion>20261023.0</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Authors>C4P741N</Authors>
-    <Product>Tempomap</Product>
+    <Product>TempoMap</Product>
   </PropertyGroup>
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\icon.ico" />
+    <AvaloniaResource Include="Assets\TempoMap.png" />
     <!-- The beat model (docs/PHASE4-PLAN.md), exported by tools/beatnet/export_onnx.py; read from beside the exe. -->
     <None Include="Models\beatnet.onnx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>

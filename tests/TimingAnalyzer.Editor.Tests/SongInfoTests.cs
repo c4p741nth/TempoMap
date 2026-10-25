@@ -10,9 +10,9 @@ public class SongInfoTests
     public void MetadataNamesTheSong()
     {
         var doc = OsuFile.Load(Fixture("ramp-mania.osu"));
-        Assert.Equal("Tempomap Fixtures", doc.Metadata["Artist"]);
+        Assert.Equal("TempoMap Fixtures", doc.Metadata["Artist"]);
         Assert.Equal("テンポマップ", doc.Metadata["ArtistUnicode"]);
-        Assert.Equal("Tempomap Fixtures - Synthetic Ramp [Ramp] (Tempomap tests)", doc.SongTitle);
+        Assert.Equal("TempoMap Fixtures - Synthetic Ramp [Ramp] (TempoMap tests)", doc.SongTitle);
         Assert.Null(OsuFile.Parse("[General]\nAudioFilename: a.mp3\n"u8.ToArray()).SongTitle);
         Assert.Equal("Unknown - Untitled [Timing] (Timing Analyzer)", OsuFile.Create("song.ogg").SongTitle);
     }
@@ -22,10 +22,10 @@ public class SongInfoTests
     {
         using var vm = new EditorViewModel(_ => throw new InvalidOperationException(), _ => new ViewModelTests.FakePlayback());
         Assert.Equal("No song loaded", vm.SongTitle);
-        Assert.Equal("Tempomap - timing editor for osu! by C4P741N", vm.WindowTitle);
+        Assert.Equal("TempoMap - timing editor for osu! by C4P741N", vm.WindowTitle);
         await vm.LoadAsync(Fixture("steady-multi.osu"));
-        Assert.Equal("Tempomap Fixtures - Synthetic Steady [Many Red Lines] (Tempomap tests)", vm.SongTitle);
-        Assert.Equal(vm.SongTitle + " - Tempomap by C4P741N", vm.WindowTitle);
+        Assert.Equal("TempoMap Fixtures - Synthetic Steady [Many Red Lines] (TempoMap tests)", vm.SongTitle);
+        Assert.Equal(vm.SongTitle + " - TempoMap by C4P741N", vm.WindowTitle);
 
         string audio = Path.Combine(Path.GetTempPath(), "timing-" + Guid.NewGuid().ToString("N") + ".ogg");
         File.WriteAllBytes(audio, []);
