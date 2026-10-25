@@ -23,8 +23,6 @@ public sealed partial class WaveformControl
     private double panStart;
     private double hoverTime = double.NaN;
     private TimingPoint[]? lanePoints;
-    private static readonly Pen GhostPen = new(Brushes.Cyan, 1.5, new DashStyle([4, 3], 0));
-    private static readonly Pen GhostBeatPen = new(Brushes.CadetBlue, .6, new DashStyle([2, 4], 0));
     private void PrepareVisuals()
     {
         if (model?.Audio is not { } audio) return;
@@ -90,6 +88,7 @@ public sealed partial class WaveformControl
         double height = Bounds.Height;
         if (model.WaveformLayer == "Spectrogram" && spectrum is not null)
             context.DrawImage(spectrum, new Rect(x(spectrumStart), 22, spectrumSpan / model.SpanMs * Bounds.Width, Math.Max(1, height - 42)));
+        IBrush label = palette["OverlayLabelBrush"], green = palette["TimingGreenBrush"], bookmark = palette["OverlayBookmarkBrush"];
         // Ruler: human-readable times, independent of beat subdivisions.
         double target = model.SpanMs / Math.Max(2, Bounds.Width / 100);
         double magnitude = Math.Pow(10, Math.Floor(Math.Log10(Math.Max(.001, target))));
@@ -97,16 +96,20 @@ public sealed partial class WaveformControl
         for (double t = Math.Ceiling(model.StartMs / step) * step; t < model.StartMs + model.SpanMs; t += step)
         {
             context.DrawLine(gridPens[1], new(x(t), 0), new(x(t), 5));
-            Text(context, TimeFormat.Osu(t), new(x(t) + 3, 3), Brushes.Gray, 10);
+            Text(context, TimeFormat.Osu(t), new(x(t) + 3, 3), label, 10);
         }
         if (model.GhostProposal)
+        {
+            Pen ghost = new(palette["OverlayGhostBrush"], 1.5, new DashStyle([4, 3], 0)), ghostBeat = new(palette["OverlayGhostBeatBrush"], .6, new DashStyle([2, 4], 0));
             foreach (var line in BeatGrid.Query(model.ProposedTiming, model.StartMs, model.StartMs + model.SpanMs, minimumBeatLength: 50).Take(2000))
-                context.DrawLine(line.Kind == GridKind.RedLine ? GhostPen : GhostBeatPen, new(x(line.Time), 22), new(x(line.Time), height - 24));
+                context.DrawLine(line.Kind == GridKind.RedLine ? ghost : ghostBeat, new(x(line.Time), 22), new(x(line.Time), height - 24));
+        }
         if (model.ShowOnsets && onsets is { } onset)
         {
             int a = Math.Clamp((int)(model.StartMs * onset.Rate / 1000), 0, onset.Peaks.SampleCount), b = Math.Clamp((int)((model.StartMs + model.SpanMs) * onset.Rate / 1000), a, onset.Peaks.SampleCount);
             var peaks = onset.Peaks.Query(a, b, Math.Max(1, (int)Bounds.Width)); double max = Math.Max(1e-12, onset.Peaks.Range(0, onset.Peaks.SampleCount).Max);
-            for (int i = 0; i < peaks.Length; i++) context.DrawLine(new Pen(Brushes.Orange, 1), new(i, height - 28), new(i, height - 28 - Math.Max(0, peaks[i].Max) / max * height * .35));
+            var onsetPen = new Pen(palette["OverlayOnsetBrush"], 1);
+            for (int i = 0; i < peaks.Length; i++) context.DrawLine(onsetPen, new(i, height - 28), new(i, height - 28 - Math.Max(0, peaks[i].Max) / max * height * .35));
         }
         var points = lanePoints ??= model.AllRows.Select(r => r.Point).ToArray();
         if (model.ShowKiai)
@@ -115,21 +118,25 @@ public sealed partial class WaveformControl
                 if ((points[i].Effects & TimingPoint.Kiai) != 0)
                 {
                     double left = Math.Max(0, x(points[i].Time)), right = Math.Min(Bounds.Width, x(i + 1 < points.Length ? points[i + 1].Time : model.DurationMs));
-                    if (right > left) context.FillRectangle(new SolidColorBrush(Color.FromArgb(100, 220, 150, 20)), new Rect(left, height - 8, right - left, 7));
+                    if (right > left) context.FillRectangle(palette["OverlayKiaiBrush"], new Rect(left, height - 8, right - left, 7));
                 }
         }
         if (model.ShowSv)
+        {
+            var svPen = new Pen(green);
             foreach (var point in points.Where(p => !p.Uninherited && p.Time >= model.StartMs && p.Time < model.StartMs + model.SpanMs))
             {
-                double px = x(point.Time); context.DrawLine(new Pen(Brushes.MediumSeaGreen), new(px, height - 24), new(px, height - 10));
-                Text(context, point.Sv.ToString("0.##'×'", CultureInfo.InvariantCulture), new(px + 2, height - 25), Brushes.MediumSeaGreen, 10);
+                double px = x(point.Time); context.DrawLine(svPen, new(px, height - 24), new(px, height - 10));
+                Text(context, point.Sv.ToString("0.##'×'", CultureInfo.InvariantCulture), new(px + 2, height - 25), green, 10);
             }
+        }
+        var bookmarkPen = new Pen(bookmark, 1, new DashStyle([2, 2], 0));
         foreach (var marker in model.Bookmarks.Where(b => b.TimeMs >= model.StartMs && b.TimeMs <= model.StartMs + model.SpanMs))
         {
-            context.DrawLine(new Pen(Brushes.Orchid, 1, new DashStyle([2, 2], 0)), new(x(marker.TimeMs), 22), new(x(marker.TimeMs), height));
-            Text(context, marker.Name, new(x(marker.TimeMs) + 3, 16), Brushes.Orchid, 11);
+            context.DrawLine(bookmarkPen, new(x(marker.TimeMs), 22), new(x(marker.TimeMs), height));
+            Text(context, marker.Name, new(x(marker.TimeMs) + 3, 16), bookmark, 11);
         }
-        if (double.IsFinite(hoverTime)) Text(context, TimeFormat.Osu(hoverTime), new(Math.Clamp(x(hoverTime) + 8, 0, Math.Max(0, Bounds.Width - 100)), 30), Brushes.Gray, 11);
+        if (double.IsFinite(hoverTime)) Text(context, TimeFormat.Osu(hoverTime), new(Math.Clamp(x(hoverTime) + 8, 0, Math.Max(0, Bounds.Width - 100)), 30), label, 11);
     }
     internal static void Text(DrawingContext context, string text, Point origin, IBrush color, double size) => context.DrawText(new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Typeface.Default, size, color), origin);
     private void Hover(PointerEventArgs e)

@@ -4,7 +4,8 @@ namespace TimingAnalyzer.Editor;
 
 /// <summary>
 /// What the editor remembers between runs (volumes, metronome, follow, speed, beat snap, shift steps, auto-time mode,
-/// table tab, window size and appearance), as JSON in the user's application data. A missing or broken file gives the defaults.
+/// table tab, waveform view and loop choices, window size, table panel width, whether Timing tools is open, and appearance),
+/// as JSON in the user's application data. A missing or broken file gives the defaults.
 /// </summary>
 public sealed record EditorSettings
 {
@@ -32,6 +33,19 @@ public sealed record EditorSettings
     public bool WindowMaximized { get; init; }
     public string Theme { get; init; } = "Dark";
     public bool AutoNormalizeSv { get; init; }
+    // View and listening choices that outlast a song (a project restores its own over them).
+    public string WaveformLayer { get; init; } = "Full";
+    public bool ShowOnsets { get; init; }
+    public bool ShowSv { get; init; } = true;
+    public bool ShowKiai { get; init; } = true;
+    public bool MeasureView { get; init; }
+    public bool GhostProposal { get; init; } = true;
+    public bool LoopEnabled { get; init; }
+    public int PreRollBeats { get; init; }
+    public string ComparisonSpeed { get; init; } = "0.75";
+    // Layout: the width of the timing table panel and whether its "Timing tools" section is open.
+    public double TablePanelWidth { get; init; } = 350;
+    public bool TimingToolsExpanded { get; init; } = true;
     public string[] RecentFiles { get; init; } = [];
     public string? LastAudioDirectory { get; init; }
     public string? LastMapDirectory { get; init; }

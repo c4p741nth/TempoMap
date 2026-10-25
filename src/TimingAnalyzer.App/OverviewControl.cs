@@ -10,9 +10,10 @@ public sealed class OverviewControl : Control
 {
     private EditorViewModel? model;
     private bool dragging;
+    private readonly CanvasPalette palette;
     public OverviewControl()
     {
-        Focusable = true;
+        Focusable = true; ClipToBounds = true; palette = new(this);
         DataContextChanged += (_, _) =>
         {
             if (model is not null) model.PropertyChanged -= Changed;
@@ -30,12 +31,20 @@ public sealed class OverviewControl : Control
         base.Render(context);
         if (model?.Audio is not { } audio || Bounds.Width <= 0) return;
         var peaks = audio.Peaks.Query(0, audio.Mono.Length, Math.Max(1, (int)Bounds.Width));
-        var pen = new Pen(Brushes.Teal);
-        for (int x = 0; x < peaks.Length; x++) context.DrawLine(pen, new(x, Bounds.Height / 2 - peaks[x].Max * Bounds.Height * .42), new(x, Bounds.Height / 2 - peaks[x].Min * Bounds.Height * .42));
+        var pen = new Pen(palette["WaveformSignalBrush"]);
+        // The song's loudest peak reaches 92% of the strip, so the frame and the playhead (the full height) always cover the wave.
+        double scale = WaveformControl.PeakScale(audio, Bounds.Height, .46);
+        for (int x = 0; x < peaks.Length; x++) context.DrawLine(pen, new(x, Bounds.Height / 2 - peaks[x].Max * scale), new(x, Bounds.Height / 2 - peaks[x].Min * scale));
         double X(double ms) => ms / model.DurationMs * Bounds.Width;
-        context.DrawRectangle(new SolidColorBrush(Color.FromArgb(35, 100, 200, 230)), new Pen(Brushes.CadetBlue), new Rect(X(model.StartMs), 0, Math.Max(1, X(model.SpanMs)), Bounds.Height));
-        foreach (var marker in model.Bookmarks) context.DrawLine(new Pen(Brushes.Orchid), new(X(marker.TimeMs), 0), new(X(marker.TimeMs), 8));
-        context.DrawLine(new Pen(Brushes.Gold, 2), new(X(model.PositionMs), 0), new(X(model.PositionMs), Bounds.Height));
+        // The viewport frame is drawn inside the control (half a pixel in), so its edges are not cut where it meets the bounds, and it
+        // reaches the last pixel when the view is at the end of the song. The playhead keeps one pixel off the ends for the same reason.
+        double left = Math.Clamp(X(model.StartMs), 0, Bounds.Width), right = Math.Clamp(X(model.StartMs + model.SpanMs), left, Bounds.Width);
+        context.DrawRectangle(palette.Tint("WorkspaceAccent", .16), new Pen(palette["WorkspaceAccent"]),
+            new Rect(left + .5, .5, Math.Max(2, right - left - 1), Math.Max(1, Bounds.Height - 1)), 3, 3);
+        var bookmark = new Pen(palette["OverlayBookmarkBrush"]);
+        foreach (var marker in model.Bookmarks) context.DrawLine(bookmark, new(X(marker.TimeMs), 0), new(X(marker.TimeMs), 8));
+        double playhead = Math.Clamp(X(model.PositionMs), 1, Math.Max(1, Bounds.Width - 1));
+        context.DrawLine(new Pen(palette["WaveformPlayheadBrush"], 2), new(playhead, 0), new(playhead, Bounds.Height));
     }
     private void SeekAt(PointerEventArgs e)
     {

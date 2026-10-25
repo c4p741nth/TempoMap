@@ -26,6 +26,15 @@ The detector can choose half/double tempo or miss short/quiet transitions; hand 
 - **Home/End** also jump to the song endpoints. Follow mode keeps playback visible.
 - Hold **Shift** and drag on the waveform, or use Shift+Left/Right, to select a time range; **Esc** clears it.
 - Theme selection at the upper right offers **Dark**, **Light** and **System**, remembered between runs.
+- The strip under the seek bar is the whole-song overview: its frame is the part shown above, the yellow line the playhead.
+  Click or drag it to seek. The bar between the waveform and the timing table is invisible until the pointer is over it; drag it to resize the table.
+
+**What is remembered between runs** (written when the window closes, to `%APPDATA%\TempoMap\settings.json`): volumes, metronome, follow, speed,
+beat snap, the Shift steps, BPM step, auto-time mode and choices, table tab, waveform view (layer, onsets, SV/Kiai lanes, four rows, ghost grid),
+loop, pre-roll and alternate speed, keyboard shortcuts and copy profiles, theme, window size and maximised state, the table panel width, and whether
+**Timing tools** is open (it starts open; the header folds it). Settings → Restore default settings resets them. Not remembered: window position, the
+Shift scope (always Selected on start, so Ctrl+arrows never move every line by surprise) and the F3 window. A project (`.tmap`) restores its own view and loop choices over these.
+Closing a window with nothing open, or with nothing changed, asks nothing.
 
 The waveform's yellow line is the current playhead. Red timing lines define BPM/grid; green inherited lines carry
 SV and effects. The timing table has **All**, **Timing** and **Inherited** tabs. Click a row to select it,
@@ -38,7 +47,13 @@ The **+** button follows the tab: All/Timing adds red; Inherited adds green. The
 remove selected points or move the selected point to the yellow line.
 
 Edit Time, BPM/SV and Meter in the point fields. **Enter**, Tab or clicking outside commits the edit;
-**Esc** cancels the field edit. **Ctrl+Z/Ctrl+Y** undo/redo. Shift and nudge controls support fine grid adjustments.
+**Esc** cancels the field edit. **Ctrl+Z/Ctrl+Y** undo/redo.
+
+The **Shift** row under Auto-time makes fine grid adjustments: ❮ ❯ beside a beat step (1/1 to 1/64 of each line's own beat),
+a millisecond step and a BPM step. It moves the red lines selected in the table (**Ctrl+A** selects them all, for a whole
+song that sits early or late); green lines never move.
+Keys: **Ctrl+Alt+←/→** beat step, **Ctrl+←/→** 1 ms (**Ctrl+Shift** 5 ms), **Ctrl+↑/↓** BPM step (**Ctrl+Shift** ten steps).
+Holding a BPM arrow keeps nudging; a run is one undo step.
 
 For Kiai, add a green point at the start of a section and tick **Kiai**. Add another at its end and clear Kiai.
 Timing/effect points define the value in effect until another point changes it; verify the result in osu!.
@@ -84,14 +99,18 @@ Internal paste and Save retain source timing. Read [the clipboard details](AUDIO
 Save writes timing into an `.osu` file. Check it in osu! with audio and metronome; UI tests cannot verify that listening step.
 The [manual checklist](EDITOR-MANUAL-TEST.md) tracks remaining desktop/audio acceptance.
 
-**F1** opens key/color help; **F2** opens the Thai tool guide. Help → About shows the app version and author.
+**F1** opens the keys page: every command key as currently set, the fixed keys and mouse moves, and what the waveform
+colours mean; **Change shortcuts…** there opens the editor. **F2** opens the Thai tool guide. Help → About shows the app
+version and author. The menu is at the top left; the TempoMap mark, the theme switch (Dark, Light, System) are at the top right.
+Every window and dialog follows the theme.
 
 
 ## Workspace and projects
 
-**F3** opens Listening, Display/bookmarks and Proposal/review tools. Listening includes range loop/pre-roll,
-alternate speed, tap tempo, explicit A/B beat counts, multipliers and shift/BPM steps. On narrow windows,
-music/metronome sliders are here; the main playback row stays visible.
+**F3** opens Listening, Display/bookmarks and Proposal/review tools as cards (two columns when the window is wide). Listening includes volumes, pre-roll,
+alternate speed, tap tempo, explicit A/B beat counts and multipliers. On narrow windows (under 1100 px),
+the music/metronome sliders are here; the metronome stays one click away on the main playback row as the ♪ button.
+The Shift row, **Loop** and **Play range** are on the main window (Loop and Play range on the waveform header).
 
 Display offers filtered waveforms, onset strength, spectrogram, SV/Kiai lanes and four rows of measures.
 Middle-drag pans, the top ruler shows time, and the overview seeks across the whole song. The table splitter resizes its panel.

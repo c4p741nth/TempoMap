@@ -64,44 +64,7 @@ public partial class MainWindow
         await SaveOsuFile(false); return !model.IsDirty;
     }
 
-    private async Task<int> Choose(string title, string message, params string[] choices)
-    {
-        var dialog = new Window { Title = title, Width = 540, MaxHeight = 500, SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, Icon = Icon };
-        var panel = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
-        panel.Children.Add(new ScrollViewer { MaxHeight = 340, Content = new TextBlock { Text = message, TextWrapping = Avalonia.Media.TextWrapping.Wrap } });
-        var buttons = new WrapPanel { ItemSpacing = 10, LineSpacing = 8 };
-        for (int i = 0; i < choices.Length; i++)
-        {
-            int result = i; var button = new Button { Content = choices[i] };
-            button.Click += (_, _) => dialog.Close(result); buttons.Children.Add(button);
-        }
-        panel.Children.Add(buttons); dialog.Content = panel; CloseOnEscape(dialog, -1);
-        return await dialog.ShowDialog<int>(this);
-    }
-
-    private async Task OfferRecovery()
-    {
-        var entries = recovery.List().Where(x => x.Path != recovery.Path).ToArray();
-        if (entries.Length == 0) return;
-        var list = new ListBox { ItemsSource = entries, SelectedIndex = 0, MaxHeight = 240 };
-        var dialog = new Window { Title = "Recover editing session", Width = 560, SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, Icon = Icon };
-        var restore = new Button { Content = "Recover selected" }; var later = new Button { Content = "Later" };
-        var buttons = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 10 };
-        buttons.Children.Add(restore); buttons.Children.Add(later);
-        var panel = new StackPanel { Margin = new Thickness(20), Spacing = 12 };
-        panel.Children.Add(new TextBlock { Text = "A previous editing session did not close normally." });
-        panel.Children.Add(list); panel.Children.Add(buttons); dialog.Content = panel;
-        restore.Click += (_, _) => dialog.Close(list.SelectedItem as RecoveryEntry); later.Click += (_, _) => dialog.Close();
-        CloseOnEscape(dialog);
-        if (await dialog.ShowDialog<RecoveryEntry?>(this) is { } entry)
-        {
-            await model.RestoreProjectAsync(entry.Project);
-            recovery.Save(model.CaptureProject());
-            File.Delete(entry.Path);
-        }
-    }
+    // Choose and OfferRecovery are in MainWindow.Dialogs.cs with the other dialogs.
 
     private async Task<IStorageFolder?> LastFolder(string? path) => path is not null && Directory.Exists(path)
         ? await StorageProvider.TryGetFolderFromPathAsync(new Uri(Path.GetFullPath(path))) : null;
