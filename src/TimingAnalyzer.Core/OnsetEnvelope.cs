@@ -7,7 +7,7 @@ public static class OnsetEnvelope
     /// and only the samples the resampling picks are kept: the same operations in the same order as filtering whole
     /// arrays band by band, without two song-length buffers (~220 MB on a 5-minute song, ~900 MB at 20 minutes).
     /// </summary>
-    public static double[] Compute(double[] mono, double rate, Coefficients? coefficients = null)
+    public static double[] Compute(double[] mono, double rate, Coefficients? coefficients = null, CancellationToken cancellationToken = default, Action<double>? progress = null)
     {
         var c = coefficients ?? Coefficients.Default;
         double ratio = 1000.0 / rate;
@@ -21,6 +21,7 @@ public static class OnsetEnvelope
         int next = 0, src = Source(0, ratio);
         for (int i = 0; i < mono.Length && next < m; i++)
         {
+            if ((i & 32767) == 0) { cancellationToken.ThrowIfCancellationRequested(); progress?.Invoke(100.0 * i / mono.Length); }
             double acc = 1;
             for (int b = 0; b < bands.Length; b++)
             {
@@ -37,6 +38,7 @@ public static class OnsetEnvelope
         d[m - 1] = -fwd[m - 2];
         for (int i = 1; i < m - 1; i++) d[i] = x[m - i - 2] - fwd[i - 1];
         d[0] = x[m - 2];
+        cancellationToken.ThrowIfCancellationRequested(); progress?.Invoke(100);
         return d;
     }
 

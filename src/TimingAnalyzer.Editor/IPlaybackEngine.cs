@@ -21,8 +21,8 @@ public static class PlaybackMath
         ? throw new ArgumentOutOfRangeException(nameof(value), "Volume must be a number.")
         : Math.Clamp(value, 0, 1);
 
-    public static double ValidateSpeed(double value) => value is 0.5 or 0.75 or 1.0 ? value :
-        throw new ArgumentOutOfRangeException(nameof(value), "Speed must be 0.5, 0.75 or 1.0.");
+    public static double ValidateSpeed(double value) => value is 0.25 or 0.5 or 0.75 or 1.0 ? value :
+        throw new ArgumentOutOfRangeException(nameof(value), "Speed must be 0.25, 0.5, 0.75 or 1.0.");
     public static double AudiblePosition(double sourceMs, double deviceLatencyMs, double speed,
         double startMs, double durationMs) => Math.Clamp(sourceMs - deviceLatencyMs * speed, startMs, durationMs);
 }

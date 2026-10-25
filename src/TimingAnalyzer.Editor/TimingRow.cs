@@ -6,11 +6,13 @@ namespace TimingAnalyzer.Editor;
 /// One row of the timing table, laid out as osu!'s Timing and Control Points list (All / Timing Points / Inherited
 /// Points): a red line (<see cref="RedIndex"/> its index among the red lines) or a green line (−1).
 /// </summary>
-public sealed record TimingRow(int RedIndex, TimingPoint Point)
+public sealed record TimingRow(int RedIndex, TimingPoint Point, int GreenIndex = -1, bool Overlaps = false)
 {
     private static readonly CultureInfo Invariant = CultureInfo.InvariantCulture;
     public bool IsRed => RedIndex >= 0;
     public bool IsGreen => RedIndex < 0;
+    public string Marker => Overlaps ? "≋" : "●";
+    public string MarkerColor => Overlaps ? "#FFB347" : IsRed ? "#E0453A" : "#3FAE49";
     public string Offset => TimeFormat.Osu(Point.Time);
     /// <summary>BPM of a red line, "x1.90" slider velocity of a green line.</summary>
     public string Value => IsRed ? OsuPrecision.FormatBpm(Point.Bpm) : "x" + Point.Sv.ToString("0.00", Invariant);

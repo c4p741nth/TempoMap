@@ -59,6 +59,10 @@ public static class AudioDecoder
         }
     }
 
-    private static IOException BassError(string action) => new("Cannot " + action + " (BASS error " +
-        ((int)Bass.LastError).ToString(CultureInfo.InvariantCulture) + ").");
+    private static IOException BassError(string action)
+    {
+        var error = Bass.LastError;
+        string hint = (int)error == 41 ? " This codec is unavailable in the native decoder. File → Convert audio to Ogg can create a separate compatible file using ffmpeg." : "";
+        return new("Cannot " + action + " (BASS error " + ((int)error).ToString(CultureInfo.InvariantCulture) + ")." + hint);
+    }
 }

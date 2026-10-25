@@ -24,7 +24,7 @@ proposal mapping and file writes; they do not establish audible synchronization 
 
 ## Load and navigate
 
-- [ ] Open audio directly (MP3, OGG or WAV). The waveform and a default 120 BPM red line appear.
+- [ ] Open audio directly (MP3, OGG or WAV). After automatic Ogg q6 preparation, the waveform and a default 120 BPM red line appear.
 - [ ] Open a `.osu` in the copied folder. Its AudioFilename resolves relative to the map, the waveform
   loads, and the side panel contains its red lines. Try a map with several BPM sections.
 - [ ] For fixture smoke checks, use copies of any of your own beatmaps with their audio beside them (the repository's
@@ -125,7 +125,7 @@ proposal mapping and file writes; they do not establish audible synchronization 
 ## Phase 3 (2026-10-18): duplicate red lines, drift mode
 
 - [ ] Open `ReeK - Multigenre Smackdown (Arrival) [Electro Genre Turnstile Sequence]` (set 1627304, ranked taiko):
-  it opens (no "Open failed"), and the status ends with "1 duplicate red line at the same time ignored".
+  it opens (no "Open failed"), retains overlapping rows with orange markers, and says the first controls playback.
 - [ ] Open Billie Jean (`E:\Music\Michael Jackson - Michael Songs From The Motion Picture - Billie Jean.ogg`), choose
   **Drift 16 beats**, press **Auto-time**: about 36 red lines between 116.5 and 117.8 BPM are listed; Apply...
   replaces the red lines; with the metronome on, the click stays on the kick and snare from the intro
@@ -140,9 +140,9 @@ proposal mapping and file writes; they do not establish audible synchronization 
   lines move, Ctrl+Z restores them.
 - [ ] On a map with hitsound volumes (green lines), apply a proposal: the red lines' volume and sample set match the
   green line before them, not 100 % normal.
-- [ ] **Copy normalized**, paste into the osu! editor timing setup (replacing its timing points), play in mania: the
-  scroll speed stays the same through the BPM changes (Billie Jean, a multi-BPM song like Yooh - RPG). Copy again
-  from the saved map: the status says the old green lines were already normalised and the SVs stay the same.
+- [ ] Copy the visible normalized rows, paste into the osu! editor timing setup (replacing its timing points), play in mania:
+  check scroll speed through BPM changes. Reopen the saved map: the green SVs stay the same. Main BPM now uses the
+  whole audio, per E46; osu!'s own last-note reference may differ.
 - [ ] Billie Jean in Normal mode: Auto-time proposes one red line (117.213, offset 103, editable) and the status
   suggests Drift 1 beat (drums wobble about 4.9 ms); a steady song (any Set B map) gets no such hint.
 - [ ] Timing table: All / Timing / Inherited tabs list red and green lines like osu!'s timing window (offset, BPM
@@ -196,7 +196,7 @@ proposal mapping and file writes; they do not establish audible synchronization 
   tempo midway, select that line too and fill again.
 - [ ] Edit any red line after a check: the violet bands go away.
 
-## E33: Auto-time range, paste, + / − / ✓
+## E33: Auto-time range, paste, + / −
 
 - [ ] Shift+drag across the waveform (start on a red line too): a blue band appears and stays; the red line does not
   move. Shift+→ / Shift+← step the playhead by the beat snap and grow / shrink a band from where they started. Esc
@@ -205,9 +205,9 @@ proposal mapping and file writes; they do not establish audible synchronization 
   (Ctrl+R): one 142 BPM red line at about 131 678, and the 220 BPM part after 169 s keeps its timing. Listen to the
   metronome over the drums there, and check the start against the map's 131 722.
 - [ ] Ctrl+Z after Auto-time range restores the previous red lines in one step.
-- [ ] Copy rows from a .osu or the osu! editor's timing setup, Ctrl+V: the red lines join (same time replaces), green
-  rows are skipped with a message. Ctrl+Shift+V asks, then replaces every red line.
-- [ ] **+** puts a red line at the playhead (yellow line), **−** deletes the selected lines, **✓** applies the fields.
+- [ ] Copy rows from a .osu or the osu! editor's timing setup, Ctrl+V: red and green rows join, including duplicates.
+  Orange overlap markers show same-kind collisions. Ctrl+Shift+V asks, then replaces every red line.
+- [ ] **+** puts a red line at the playhead in All/Timing (green in Inherited), **−** deletes selected points, Enter or leaving a field saves its edits (E48 replaces the old ✓ button).
   The To playhead button and Ctrl+Shift+P are gone (E37 brings the move back as ⇥ beside +).
 
 ## E32: menu bar, toolbars, shortcuts, remembered settings
@@ -251,7 +251,7 @@ proposal mapping and file writes; they do not establish audible synchronization 
   from the left; while playing, playback continues from the line. (Since E32 a single click only selects.)
 - [ ] Copy timing points and paste into the osu! editor's timing setup: only number rows, no `[TimingPoints]`.
 - [ ] Shift −⅛ / +⅛ beat moves each red line by an eighth of its own beat, one undo step.
-- [ ] Open a .osu: the window title reads "Artist - Title [Difficulty] (Mapper) - Tempomap by C4P741N";
+- [ ] Open a .osu: the window title reads "Artist - Title [Difficulty] (Mapper) - TempoMap by C4P741N";
   open plain audio: its file name.
 
 ## Phase 1.3: BPM lock, per-section auto-time, follow and volume
@@ -278,10 +278,10 @@ proposal mapping and file writes; they do not establish audible synchronization 
   that red lines stay unchanged. Confirm Apply: one red line replaces the old red lines. Undo restores them.
 - [ ] If only approximate BPM is found, the offset is explicitly unavailable. Applying without a manually
   entered offset must fail clearly; supply one and verify the confirmation and applied timing.
-- [ ] Copy [TimingPoints], paste into a text editor, and inspect invariant numbers, red lines and original
-  green lines. Red times are integers; beat lengths retain full precision.
+- [ ] Copy timing rows into a text editor: invariant numbers, red/green times shifted -33 ms, normalized green rows
+  included. Red times are integers; beat lengths retain full precision.
 - [ ] Save the disposable `.osu`. Confirm the `.osu.bak` contains the exact pre-save file. Check that only
-  red timing rows changed; green rows, hit objects and other sections retain their original text.
+  timing rows include visible normalization; hit objects and other sections retain their original text.
   Repeat Save and confirm the backup now contains the preceding saved version.
 - [ ] Open the saved map in the **osu! editor**. Inspect timing points, inherited SV/sample changes,
   measure resets and beat alignment. Play in osu! to confirm offset and BPM, including section changes.
@@ -292,3 +292,87 @@ proposal mapping and file writes; they do not establish audible synchronization 
 Record OS/audio device, song, speed, seek time and observed drift for any synchronization failure.
 Record remaining GUI or osu! issues in `docs/PHASE1-STATUS.md`; do not mark this checklist passed merely
 because the automated build and tests pass.
+
+## Calibrated Copy and residual audio calibration (E45/E46)
+
+Recorded comparison (2026-10-25): `tm_1000.wav` at 1000 ms / 120 BPM has 42 pairs within 0.05 ms; the osu!
+captures show delayed ticks and 10 ms timing steps. See `OSU-AUDIO-TIMING.md`. This confirms this synthetic map's
+TempoMap playback, not every Auto-time result or the full checklist below. The user selected fixed -33 ms for this setup.
+
+- [ ] Use the synthetic map and recording procedure in `OSU-AUDIO-TIMING.md` to measure stable's tick/music delay
+  at 100% speed on the current device. Record universal offset, compatibility mode and the result's spread.
+- [ ] Copy the song timing with the fixed -33 ms compensation; replace the timing points in a disposable osu! map.
+  Verify red/green changes remain together and listen near the beginning, middle and end. Check gameplay separately.
+- [ ] Keep TempoMap timing visible while copying: it stays unchanged. Copy emits -33 ms externally, while
+  Save .osu and internal Ctrl+C/V retain the original times. The separate Copy to osu! dialog is removed.
+
+## Unified workflow (E46)
+
+Automated real-window checks cover both 1280x720/900x500, actual copy/paste clicks and keys, orange markers,
+1/64 button, drag/drop conversion, save/reopen and Copy with 553 rows. The following are manual acceptance items.
+
+- [ ] Type a locked BPM and proposal offset, then Open audio or drag/drop another song: both old inputs clear.
+- [ ] Import MP3/WAV/FLAC/non-q6 Ogg: a q6 Ogg appears beside the source before the waveform; originals stay intact.
+  Repeat open: the existing matching sidecar is reused. An unrelated `.ogg` sibling is preserved with a new name used.
+- [ ] Import a `.osu` referencing non-q6 audio, then Save: AudioFilename references the prepared Ogg relatively.
+- [ ] Multi-BPM: Inherited/All show main/BPM green rows including x1.00 at the main tempo. Verify main BPM against
+  duration over the whole audio, including its tail; authored SV effects remain on top.
+- [ ] Copy a selected red or green row, then paste within TempoMap: original times and distinct duplicate rows.
+  Both overlaps display orange; Ctrl+Z/Redo restore the whole operation. Copy to a text editor: times are -33 ms.
+- [ ] Pick 1/64 in Shift and click earlier/later: each selected red uses its own beat, rounded to integer ms.
+- [ ] Close during a long conversion: no lingering ffmpeg process or staged Ogg; original audio remains.
+
+## Point editing and navigation (E48)
+
+Automated checks use real headless MainWindow input at 1280x720 and 900x500. These items cover desktop acceptance.
+
+- [ ] Ctrl+P adds red at the yellow playhead and selects BPM text for typing, including when a field already has focus.
+  Enter saves. Adding at an existing red time selects the newly added row.
+- [ ] Edit Time/BPM/Meter, then Enter, Tab or click another row/waveform: the original point saves before selection changes.
+  Moving Time past another point still selects the row clicked; an unchanged blur adds no undo step.
+- [ ] Esc in a field cancels its draft. Invalid Enter leaves focus and shows an error; leaving the invalid field restores
+  its saved value. Playback crossing a section while typing does not replace the field's target.
+- [ ] Point actions are ordered +, minus, move-to-yellow after Meter (E51), reachable by scrolling the inspector. No checkmark button.
+  + / Insert adds red in All/Timing and green in Inherited; the new value field has focus.
+- [ ] Ctrl+G adds green from every tab (switching Timing to All), with SV selected. Change Time/SV, then move/delete/undo;
+  samples/volume/kiai and the red grid remain. Required automatic normalization rows can reappear after deletion.
+- [ ] After Auto-time, Offset and Apply are together before the main BPM note, including at the minimum window size.
+  Cancel retains the proposal; Ctrl+Enter while typing Offset applies the edited offset after confirmation.
+- [ ] Seek bar start/end icons and Home/End move the yellow line and view to song boundaries, paused or playing,
+  including Follow off. Home/End inside a field move the typing caret.
+- [ ] Listen while adding/editing points and using the new navigation. Confirm undo/redo, Save/reopen and osu! paste
+  preserve the intended timing, SV and audible alignment.
+
+## Workspace appearance (E50)
+
+- [ ] Use the header appearance picker to select Dark, Light and System. Window surfaces, fields, popup menus and
+  confirmation dialogs should follow immediately. System should follow the OS appearance, including OS changes.
+- [ ] Close and reopen with Light selected; Light returns. Restore default settings and verify Dark returns.
+  An existing settings file without a Theme entry opens in Dark.
+- [ ] In both themes inspect waveform, subdivisions/beats/bars, timing markers, selected points, range highlight and
+  amber playhead. Primary button text stays readable on its mint/teal fill, also on hover and keyboard focus.
+- [ ] At 900x500 and 1280x720, open a long song title and Auto-time proposal. The theme picker, Copy/Paste, point
+  toolbar, Offset/Apply and seek controls stay reachable; text trims and panels scroll without covering buttons.
+- [ ] Repeat Ctrl+P/Ctrl+G, field Enter/Esc/blur, delete/move/undo, copying many rows and seek navigation in both
+  themes. Changing appearance must keep timing edits, navigation, playback and pending proposals.
+- [ ] With no audio, the waveform explains open/drop. Loading a song removes the hint and names it in the waveform
+  header. Check desktop DPI scaling and native title bar/menus on the actual display.
+
+## Inline analysis, SV and transport follow-up (E51)
+
+- [ ] Auto-time fills the existing BPM/Offset/Apply group without adding a result panel. Edit both values and Apply;
+  multi-BPM still applies all proposed red lines. At 900x500 the group wraps together with its fields on one line.
+  Type over a previous BPM result and run Auto-time twice: keep the typed BPM and fit only offset (E52).
+  Check both whole and fractional BPM, then Apply; clearing the BPM box restores automatic detection.
+- [ ] Metronome/Music percentages follow their sliders; 0.25 speed plays with pitch preserved and synced clicks.
+- [ ] Add green at a chorus start and enable Kiai; add another at its end and disable Kiai. Copy/Save/reopen and
+  check the effect in osu! without changing the intended SV. The point buttons sit after Meter in both themes.
+- [ ] Manual SV is default. Enter 1.75, edit/add red lines, Save/reopen: green values stay fixed. Enable Auto normalize,
+  edit BPM, then Undo/Redo through the mode switch: mode and values restore together. Disabling freezes visible values.
+- [ ] Enter multiplier 0.5 and press Apply repeatedly: BPM halves each press and Undo reverses one press. Invalid/zero
+  factors are rejected. Confirm Kiai and SV are not changed in Manual mode.
+- [ ] Go to song end with End/the icon, change speed/timing there, seek back or Play: no BASS error 7, Play restarts.
+  Check an Ogg with a fractional duration and verify the actual speaker output at 0.25.
+- [ ] The mint logo matches the header/window/taskbar/Explorer; EXE and app title use TempoMap (E53-E54).
+  F2 opens the Thai tool guide; close stays visible on
+  short windows. File has one Copy all command; selected Copy and the Settings SV mode match the visible rows.

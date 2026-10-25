@@ -88,7 +88,7 @@ public class RangeTests
     }
 
     [Fact]
-    public async Task PastedRedLinesJoinTheTimingAndGreenRowsAreSkipped()
+    public async Task PastedRedAndGreenRowsJoinTheTimingIncludingOverlaps()
     {
         var vm = NewModel();
         await vm.LoadAsync(Path.GetTempFileName());
@@ -97,10 +97,13 @@ public class RangeTests
         string text = "[TimingPoints]\r\n455,211.26760563380282,4,1,0,100,1,0\r\n5000,272.72727272727275,4,1,0,100,1,0\r\n" +
             "6000,-50,4,1,0,100,0,0\r\n";
         vm.Paste(text);
-        Assert.Equal([455.0, 1000, 5000], vm.Edits.RedLines.Select(p => p.Time));
-        Assert.Equal(220, vm.Edits.RedLines[2].Bpm, 6); // The pasted line at 5000 replaced the old one.
-        Assert.Equal([0, 2], vm.SelectedIndices);
-        Assert.Equal("Pasted 2 red lines (1 replaced a red line at the same time); 1 green line skipped (read-only here). Ctrl+Z undoes.", vm.Status);
+        Assert.Equal([455.0, 1000, 5000, 5000], vm.Edits.RedLines.Select(p => p.Time));
+        Assert.Equal(150, vm.Edits.RedLines[2].Bpm, 6); // Original first, pasted duplicate second.
+        Assert.Equal(220, vm.Edits.RedLines[3].Bpm, 6);
+        Assert.Equal([0, 3], vm.SelectedIndices);
+        Assert.Contains("overlaps retained", vm.Status);
+        Assert.Contains("and 1 green line", vm.Status);
+        Assert.Contains(vm.InheritedRows, r => r.Point.Time == 6000 && Math.Abs(r.Point.Sv - 2) < 1e-8);
         vm.Undo();
         Assert.Equal([1000.0, 5000], vm.Edits.RedLines.Select(p => p.Time));
         vm.Paste(text, replaceAll: true);
@@ -109,6 +112,7 @@ public class RangeTests
         vm.Paste("hello");
         Assert.Contains("A timing point needs time and beat length", vm.Status);
         vm.Paste("6000,-50,4,1,0,100,0,0");
-        Assert.Equal("The clipboard holds only green lines; green lines are read-only here.", vm.Status);
+        Assert.Contains("and 1 green line", vm.Status);
+        Assert.Equal(2, vm.InheritedRows.Count(r => r.Point.Time == 6000));
     }
 }

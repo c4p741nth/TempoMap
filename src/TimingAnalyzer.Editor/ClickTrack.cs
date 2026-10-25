@@ -3,11 +3,15 @@ namespace TimingAnalyzer.Editor;
 /// <summary>Stateless float PCM renderer, suitable for arbitrary buffers and seeking.</summary>
 public sealed class ClickTrack
 {
-    private readonly ScheduledClick[] clicks;
+    private readonly TimingPoint[] reds;
+    private readonly int rate;
+    private readonly long endSample;
     private readonly float[] normal, accent;
     public ClickTrack(IReadOnlyList<TimingPoint> reds, int rate, long endSample)
     {
-        clicks = ClickSchedule.Query(reds, rate, 0, endSample);
+        this.reds = BeatGrid.Effective(reds);
+        this.rate = rate;
+        this.endSample = endSample;
         normal = Tick(rate, 1200);
         accent = Tick(rate, 1800);
     }
@@ -22,14 +26,11 @@ public sealed class ClickTrack
         float volume = (float)PlaybackMath.ClampVolume(gain);
         interleaved.Clear();
         if (!enabled || volume == 0) return;
-        long end = startSample + interleaved.Length / channels;
-        int low = 0, high = clicks.Length;
-        while (low < high)
-        {
-            int mid = low + (high - low) / 2;
-            if (clicks[mid].Sample + normal.Length <= startSample) low = mid + 1; else high = mid;
-        }
-        for (int n = low; n < clicks.Length && clicks[n].Sample < end; n++)
+        long end = Math.Min(endSample, startSample + interleaved.Length / channels);
+        if (end <= startSample) return;
+        // Include the tail of a click started in the preceding buffer. Cost depends on this buffer, not song length.
+        var clicks = ClickSchedule.Query(reds, rate, Math.Max(0, startSample - normal.Length + 1), end, minimumBeatLength: 50);
+        for (int n = 0; n < clicks.Length; n++)
         {
             var click = clicks[n];
             var tick = click.Downbeat ? accent : normal;

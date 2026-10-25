@@ -57,7 +57,7 @@ public class ExportTests
         finally { File.Delete(song); }
     }
     [Fact]
-    public async Task SaveFixtureCreatesExactBackupAndPreservesGreenRows()
+    public async Task SaveFixtureCreatesExactBackupAndSavesVisibleNormalizedGreenRows()
     {
         string dir = Path.Combine(Path.GetTempPath(), "timing-editor-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
@@ -68,8 +68,8 @@ public class ExportTests
             File.WriteAllBytes(path, original);
             using var vm = new EditorViewModel(_ => throw new InvalidOperationException(), _ => new ViewModelTests.FakePlayback());
             await vm.LoadAsync(path);
-            var greens = vm.Document!.TimingPoints.Where(p => !p.Uninherited).ToArray();
             vm.Edits.MoveRedLine(0, vm.Edits.RedLines[0].Time + 1);
+            var greens = TimingClipboard.Parse(vm.ClipboardText()).Where(p => !p.Uninherited).ToArray();
             vm.Save(path);
             Assert.Equal(original, File.ReadAllBytes(path + ".bak"));
             Assert.Equal(greens, OsuFile.Load(path).TimingPoints.Where(p => !p.Uninherited));
@@ -77,7 +77,7 @@ public class ExportTests
             byte[] edited = File.ReadAllBytes(path);
             vm.Save(path);
             Assert.Equal(edited, File.ReadAllBytes(path));
-            Assert.Equal(edited, File.ReadAllBytes(path + ".bak"));
+            Assert.Equal(original, File.ReadAllBytes(path + ".bak"));
         }
         finally { File.Delete(path); File.Delete(path + ".bak"); Directory.Delete(dir); }
     }

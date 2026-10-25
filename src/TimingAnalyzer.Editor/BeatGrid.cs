@@ -8,20 +8,32 @@ public static class BeatGrid
     public static TimingPoint[] Sort(IEnumerable<TimingPoint> points)
     {
         var result = points.Select(p => p.Validate()).OrderBy(p => p.Time).ToArray();
-        if (result.Any(p => !p.Uninherited) || result.Zip(result.Skip(1)).Any(p => p.First.Time == p.Second.Time))
-            throw new ArgumentException("Red lines must have distinct times.");
+        if (result.Any(p => !p.Uninherited)) throw new ArgumentException("Expected red lines.");
         return result;
     }
 
+    /// <summary>First red line at a time controls playback; the table retains every duplicate.</summary>
+    public static TimingPoint[] Effective(IEnumerable<TimingPoint> points) => Sort(points)
+        .GroupBy(p => p.Time).Select(g => g.First()).ToArray();
+
     /// <summary>Half-open range [start, end); a new red line truncates the previous section.</summary>
-    public static IEnumerable<GridLine> Query(IReadOnlyList<TimingPoint> reds, double start, double end, int division = 1)
+    public static IEnumerable<GridLine> Query(IReadOnlyList<TimingPoint> reds, double start, double end, int division = 1, double minimumBeatLength = 0)
     {
         if (!double.IsFinite(start) || !double.IsFinite(end) || division is < 1 or > 16)
             throw new ArgumentOutOfRangeException(nameof(start));
         for (int i = 0; i < reds.Count; i++)
         {
             var p = reds[i];
-            double limit = Math.Min(end, i + 1 < reds.Count ? reds[i + 1].Time : end);
+            if (i > 0 && reds[i - 1].Time == p.Time) continue;
+            // Gimmick timing remains editable/exportable. Bound work even for vanishingly small beat lengths.
+            if (p.BeatLength < minimumBeatLength || (end - Math.Max(start, p.Time)) / (p.BeatLength / division) > 100000)
+            {
+                if (p.Time >= start && p.Time < end) yield return new(p.Time, i, 0, division, GridKind.RedLine);
+                continue;
+            }
+            int next = i + 1;
+            while (next < reds.Count && reds[next].Time == p.Time) next++;
+            double limit = Math.Min(end, next < reds.Count ? reds[next].Time : end);
             double step = p.BeatLength / division;
             long first = Math.Max(0, (long)Math.Floor((start - p.Time) / step));
             for (long k = first; ; k++)
@@ -29,7 +41,7 @@ public static class BeatGrid
                 double t = p.Time + k * step;
                 if (t >= limit) break;
                 if (t < start) continue;
-                var kind = k == 0 ? GridKind.RedLine : k % (p.Meter * division) == 0 ? GridKind.Measure :
+                var kind = k == 0 ? GridKind.RedLine : k % ((long)p.Meter * division) == 0 ? GridKind.Measure :
                     k % division == 0 ? GridKind.Beat : GridKind.Subdivision;
                 yield return new(t, i, k, division, kind);
             }
