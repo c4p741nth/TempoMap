@@ -63,6 +63,7 @@ public class PointWorkflowTests
     public void EditingNormalizedGreenKeepsItsVisibleSvAndDoesNotMultiplyOtherGreens()
     {
         using var vm = Create();
+        vm.AutoNormalizeSv = true;
         vm.Edits.Replace([new(0, 500), new(4000, 250)]);
         var original = vm.ClipboardText();
         vm.SelectTableRows([vm.InheritedRows[0]], vm.InheritedRows[0]);
@@ -79,6 +80,7 @@ public class PointWorkflowTests
     public void DecimalMainBpmDoesNotChangeTypedSvOrAccumulateRoundingOnBlur()
     {
         using var vm = Create();
+        vm.AutoNormalizeSv = true;
         vm.Edits.Replace([new(0, 60000.0 / 130), new(1000, 60000.0 / 155), new(8000, 500)]);
         vm.Seek(2000); vm.InsertInherited();
         vm.BpmText = "1.75"; vm.ApplyFields();
@@ -116,6 +118,7 @@ public class PointWorkflowTests
         try
         {
             using var vm = new EditorViewModel(_ => Task.FromResult(AudioContent.Create(new double[20000], 1000)), _ => engine);
+            vm.AutoNormalizeSv = true;
             await vm.LoadAsync(song);
             vm.Edits.Replace([new(0, 500), new(4000, 250)]);
             vm.SelectRows([0], 0); vm.TogglePlay();

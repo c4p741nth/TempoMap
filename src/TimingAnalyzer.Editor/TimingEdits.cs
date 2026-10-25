@@ -1,30 +1,32 @@
 namespace TimingAnalyzer.Editor;
 
 public enum RedLineScope { All, Selected }
+public sealed record TimingState(TimingPoint[] Points, bool AutoNormalizeSv);
 
 public sealed class UndoStack
 {
-    private readonly Stack<(TimingPoint[] Before, TimingPoint[] After)> undo = new(), redo = new();
+    private readonly Stack<(TimingState Before, TimingState After)> undo = new(), redo = new();
     public bool CanUndo => undo.Count > 0;
     public bool CanRedo => redo.Count > 0;
     /// <summary>Changes whenever a step is recorded, undone or redone (not when one is extended), so a caller can tell that
     /// nothing else was edited since the step it extends.</summary>
     public int Version { get; private set; }
-    public void Record(TimingPoint[] before, TimingPoint[] after)
+    private static TimingState Copy(TimingState state) => state with { Points = state.Points.ToArray() };
+    public void Record(TimingState before, TimingState after)
     {
-        undo.Push((before.ToArray(), after.ToArray()));
+        undo.Push((Copy(before), Copy(after)));
         redo.Clear();
         Version++;
     }
     /// <summary>Makes the last recorded step end at <paramref name="after"/> instead: one undo reverts a run of small edits.</summary>
-    public void ExtendLast(TimingPoint[] after)
+    public void ExtendLast(TimingState after)
     {
         var last = undo.Pop();
-        undo.Push((last.Before, after.ToArray()));
+        undo.Push((last.Before, Copy(after)));
         redo.Clear();
     }
-    public TimingPoint[] Undo() { var edit = undo.Pop(); redo.Push(edit); Version++; return edit.Before.ToArray(); }
-    public TimingPoint[] Redo() { var edit = redo.Pop(); undo.Push(edit); Version++; return edit.After.ToArray(); }
+    public TimingState Undo() { var edit = undo.Pop(); redo.Push(edit); Version++; return Copy(edit.Before); }
+    public TimingState Redo() { var edit = redo.Pop(); undo.Push(edit); Version++; return Copy(edit.After); }
 }
 
 public sealed class TimingEdits
@@ -34,21 +36,23 @@ public sealed class TimingEdits
     public IReadOnlyList<TimingPoint> RedLines => Array.AsReadOnly(points);
     public IReadOnlyList<TimingPoint> GreenLines => Array.AsReadOnly(greens);
     public UndoStack History { get; } = new();
-    public TimingEdits(IEnumerable<TimingPoint> redLines, IEnumerable<TimingPoint>? greenLines = null)
+    public bool AutoNormalizeSv { get; private set; }
+    public TimingEdits(IEnumerable<TimingPoint> redLines, IEnumerable<TimingPoint>? greenLines = null, bool autoNormalizeSv = false)
     {
         points = BeatGrid.Sort(redLines);
         greens = SortGreens(greenLines ?? []);
+        AutoNormalizeSv = autoNormalizeSv;
     }
     private static TimingPoint[] SortGreens(IEnumerable<TimingPoint> rows) => rows.Select(p => p.Validate())
         .Where(p => !p.Uninherited).OrderBy(p => p.Time).ToArray();
-    private TimingPoint[] State() => points.Concat(greens).ToArray();
+    private TimingState State() => new(points.Concat(greens).ToArray(), AutoNormalizeSv);
     public event Action? Changed;
 
     public void Replace(IEnumerable<TimingPoint> redLines)
     {
         var after = BeatGrid.Sort(redLines);
         if (points.SequenceEqual(after)) return;
-        History.Record(State(), after.Concat(greens).ToArray());
+        History.Record(State(), new(after.Concat(greens).ToArray(), AutoNormalizeSv));
         points = after;
         Changed?.Invoke();
     }
@@ -60,19 +64,21 @@ public sealed class TimingEdits
     {
         var after = BeatGrid.Sort(redLines);
         if (points.SequenceEqual(after)) return;
-        if (continuing && History.CanUndo) History.ExtendLast(after.Concat(greens).ToArray());
-        else History.Record(State(), after.Concat(greens).ToArray());
+        if (continuing && History.CanUndo) History.ExtendLast(new(after.Concat(greens).ToArray(), AutoNormalizeSv));
+        else History.Record(State(), new(after.Concat(greens).ToArray(), AutoNormalizeSv));
         points = after;
         Changed?.Invoke();
     }
     public void Update(int index, TimingPoint value) => Replace(points.Select((p, i) => i == index ? value : p));
-    public void ReplaceTiming(IEnumerable<TimingPoint> redLines, IEnumerable<TimingPoint> greenLines)
+    public void ReplaceTiming(IEnumerable<TimingPoint> redLines, IEnumerable<TimingPoint> greenLines, bool? autoNormalizeSv = null)
     {
         var after = BeatGrid.Sort(redLines);
         var afterGreens = SortGreens(greenLines);
-        if (points.SequenceEqual(after) && greens.SequenceEqual(afterGreens)) return;
-        History.Record(State(), after.Concat(afterGreens).ToArray());
+        bool mode = autoNormalizeSv ?? AutoNormalizeSv;
+        if (points.SequenceEqual(after) && greens.SequenceEqual(afterGreens) && mode == AutoNormalizeSv) return;
+        History.Record(State(), new(after.Concat(afterGreens).ToArray(), mode));
         points = after; greens = afterGreens;
+        AutoNormalizeSv = mode;
         Changed?.Invoke();
     }
     // Edited fields are rounded to osu! precision (integer ms, BPM to 3 decimals); untouched fields stay exact.
@@ -145,10 +151,11 @@ public sealed class TimingEdits
                     " red lines cannot cross or overlap a neighbouring red line.");
         Replace(after);
     }
-    private void Restore(TimingPoint[] state)
+    private void Restore(TimingState state)
     {
-        points = BeatGrid.Sort(state.Where(p => p.Uninherited));
-        greens = SortGreens(state.Where(p => !p.Uninherited));
+        points = BeatGrid.Sort(state.Points.Where(p => p.Uninherited));
+        greens = SortGreens(state.Points.Where(p => !p.Uninherited));
+        AutoNormalizeSv = state.AutoNormalizeSv;
         Changed?.Invoke();
     }
     public void Undo() { if (History.CanUndo) Restore(History.Undo()); }

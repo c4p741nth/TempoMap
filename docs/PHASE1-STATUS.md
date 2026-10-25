@@ -67,28 +67,38 @@ commit it with that task. A new run resumes from the first task that is not `don
 | E47 Standard Release rebuild and generated-file cleanup | done | not committed (user request); base 821a2f6 | User closed the old App and requested standard build/cleanup. App Release rebuilt normally with 0 warnings/errors. Removed 7 obsolete `bin/Phase11` folders, Debug outputs, redundant alternate builds/staging, generated integration fixtures and decoded PCM buffers: 48 verified targets, 1,800 files, 1,978,670,472 logical bytes (1.98 GB). Every deletion stayed inside the workspace and contained no tracked files/reparse points; scripts, measured logs/JSON, synthetic calibration assets, environments/caches and the release zip were retained. Release zip SHA256 verified; post-cleanup Editor 235/235 and Core 41/41 pass. Current executable: `src/TimingAnalyzer.App/bin/Release/net10.0/win-x64/Tempomap.exe`; `artifacts/dev` was redundant and removed. |
 | E48 Timing-point workflow and navigation | done (automated; desktop acceptance pending) | not committed (user request); base 821a2f6 | Ctrl+P adds red and selects BPM; Ctrl+G adds green and selects SV from every tab. +/Insert follow All/Timing vs Inherited. Fixed +, minus, move toolbar; Enter/Tab/blur saves, Esc cancels, invalid Enter keeps focus; list focus restores transport, playback does not redirect a field target. Green Time/SV/move/delete/undo supported; automatic normalization rows remain. Auto-time result actions precede normalization and Ctrl+Enter works in Offset. Seek start/end icons and Home/End seek and reveal boundaries, including playing with Follow off. Original-source UI control reproduced old behavior; SV inverse-factor mutation fails its regression and restores by SHA256. Release 0 warnings/errors, Editor 241, Core 41, new UI 132, prior workflow 81 checks pass. Initial preview retired by E49; current executable is the normal Release path. |
 | E49 Standard E48 rebuild and duplicate-output cleanup | done | not committed (user request); base 821a2f6 | User closed the old App and requested a normal build plus removal of separated copies. Release App 0 warnings/errors; App/Editor SHA256 match the tested E48 preview. C# 282/282 pass. Removed 8 generated build targets, 457 files, 998,587,067 logical bytes after workspace/tracked-file/reparse checks. Normal exe/model/native DLLs verified after deletion. Retained source/harness, baselines, logs/TRX and preview images. No product-code or version changes. Current executable: `src/TimingAnalyzer.App/bin/Release/net10.0/win-x64/Tempomap.exe`. |
+| E50 Modern workspace and remembered appearance | done (automated; desktop acceptance pending) | not committed; base 567dcc8 | Ink/mint Dark and white/teal Light palettes, immediate Dark/Light/System picker in the branded header, remembered with backward-compatible Dark default. Grouped tool surfaces, point inspector, adaptive waveform/grid/markers/playhead, song header and empty-state hint. Fluent primary-class collision fixed so mint buttons use dark ink; template/hover contrast checked. Size accounting keeps waveform/table usable at 900x500. Release 0 warnings/errors; C# 282, UI 342 checks covering both themes at both sizes; rendered previews inspected. Disabling persistence and picker application each failed its real path, then exact source hashes restored. Normal Release matches tested DLL hashes; scratch compiled outputs removed. |
+| E51 Inline timing controls, manual SV/Kiai and EOF transport | done (automated; desktop listening pending) | not committed; base 567dcc8 plus E50 | New five-bar app icon (7 ICO sizes, actual EXE payloads verified), fixed BPM/Offset/Apply group, volume percentages, 0.25 speed, point actions after Meter, green Kiai, typed repeatable BPM multiplier and Thai tool guide (F2). Redundant Copy normalized removed. User chose Manual SV default; auto mode is optional and its storage representation is undone with the mode. BASS EOF error 7 reproduced on Ogg/WAV: logical EOF keeps a valid paused graph, sample seeks clamp below length, replay/settings recover. C# 288, UI 510 checks pass; matched native seek cases 12: errors 6 before, 0 after, plus 3 EOF/settings/replay controls. Exact-source negative controls reproduce EOF and catch broken mode undo. Normal Release and tested App/Editor/Audio hashes match; temporary builds removed. |
+| E52 Preserve typed BPM when rerunning Auto-time | done (automated; real-song acceptance pending) | not committed; base 567dcc8 plus E50-E51 | Editing the inline BPM after a previous proposal now also updates the locked BPM used by Auto-time, so only offset is fitted. Detector-filled values stay automatic; clearing the box releases the lock. Regression before: 5 focused failures; after: 10 pass. Actual Auto-time/CoreTiming clicks, repeat and Apply: 50 checks at 1280x720/900x500. Pre-fix UI control fails on the reported path; exact fixed source restored by SHA256. Final C# 293 pass, normal Release 0 warnings/errors; normal/tested DLL hashes match. |
+| E53 Shared app logo and Explorer refresh | done (user confirmed Explorer updated) | not committed; base 567dcc8 plus E50-E52 | Header uses the exact PNG payload of the 256px ICO frame; generator writes both. One native EXE icon group, all 7 frames match. Added a Windows icon refresh helper; user confirmed the bird icon in Explorer changed to the mint mark. Normal Release 0 warnings/errors; headless shared-image and E52 workflows 54 checks. Old-header control fails, restored source hash and normal/tested DLL hashes match. Earlier C# 293 pass retained, not rerun for assets. |
+| E54 TempoMap branding, concise docs and PR-only CI | done locally (Actions run after user push) | not committed; base 567dcc8 plus E50-E53 | UI, assembly/EXE metadata, templates and package names now use TempoMap. Normal output has TempoMap.exe/DLL/deps/runtimeconfig with exact case. README 469 -> 49 lines; focused user/development guides and docs index replace the mixed front page. User chose PR-only CI into develop/main; main PR retains package preview, develop push duplication removed. Release safeguards unchanged. C# 293, Python 10, headless UI 56 pass; normal Release 0 warnings/errors. Local links, branding, icon frames and tested DLL hashes audited; no remote Actions or release/package run. |
 
 Status values: `todo`, `in-progress`, `done`, `blocked`.
 
 ## Last stop
 
-E49 (2026-10-25): the user closed the old App and requested the standard build and removal of separated copies.
-Release App build passed with 0 warnings/errors. App/Editor DLL hashes match the tested E48 preview.
-C# tests 282/282 pass (Editor 241, Core 41). Removed 8 duplicate build targets / 457 files /
-998,587,067 logical bytes; all targets stayed inside the workspace, had no tracked files or reparse points,
-and are confirmed absent. Normal App, model and native runtime DLLs remain intact.
+E54 (2026-10-25): TempoMap casing is consistent in the current app/EXE, metadata, release/packaging templates
+and active guides. README now introduces the product and routes users to focused docs. User explicitly chose
+PR-only CI: PRs into develop/main build/test, PRs into main also package; no extra develop push CI.
+Main PR checks stay because they test the merge result. Release still validates/packages its actual main commit.
 
 - When: 2026-10-25
 - Who (executor/model): Codex
-- Stopped because: standard E48 rebuild and cleanup are complete. No product-code changes in E49.
-- Working tree state: E45-E49 remain uncommitted on base 821a2f6 under the user's earlier no-commit instruction.
-  No git state mutation or network git action. No Tempomap process was running before build/cleanup.
-- Next step: use `src/TimingAnalyzer.App/bin/Release/net10.0/win-x64/Tempomap.exe`.
-  `artifacts/ux-preview` and scratch compiled copies were removed. InformationalVersion remains 20261023.0.
-  E48 validation remains headless UI 132 + prior workflow 81 checks; not rerun in this build/cleanup-only task.
-  Desktop listening/acceptance (116 unchecked items) and portable FFmpeg packaging remain separate.
-- Evidence: `.dotnet-home/e49-rebuild/` has build/test logs, TRX, delete-plan/deleted/verified JSON and scripts.
-  E48 source/harness, baseline backups, logs/TRX, preview images and other validation evidence were retained.
+- Status/commit: E50-E54 uncommitted on base 567dcc8; no git state mutation/network action.
+- Validation: normal Release 0 warnings/errors; C# 293 passed, Python 10 passed,
+  headless MainWindow 56 checks (Skia, shared bitmap/casing and E52 Auto-time reruns/Apply).
+  Exact normal filenames and EXE ProductName/FileDescription are TempoMap; normal/tested DLL hashes match.
+  49 local Markdown links and 77 active text files audited; all icon frames match.
+  PowerShell scripts parse. Byte-exact .osu CRLF preserved: whitespace check uses cr-at-eol plus all normal checks.
+- Next step: `src/TimingAnalyzer.App/bin/Release/net10.0/win-x64/TempoMap.exe`.
+  User already confirmed Explorer's mint icon. Desktop shortcut resolves to this file on Windows; its stored
+  target spelling remains historical after COM normalization, so the attempted edit was restored byte-exact.
+  CI event matrix/conditions reviewed locally; no YAML parser package added and no remote Actions run or package
+  created. Changes take effect on GitHub after the user pushes. Manual checklist: 129 unchecked.
+  E52 compiled scratch still awaits cleanup after earlier policy rejection; this task reused its UI output.
+- Evidence: `.dotnet-home/branding-20261025/verified.json`, final-tests, python-tests.log, ui-final.log,
+  observed-checks.json, EXE metadata/native icon extractions; E50-E53 evidence retained. No version/package/Core/
+  reference/reverse changes, release or server operations.
 
 ## Final verification
 

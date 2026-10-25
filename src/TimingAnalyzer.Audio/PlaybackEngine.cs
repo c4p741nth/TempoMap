@@ -122,6 +122,14 @@ public sealed class PlaybackEngine : IPlaybackEngine
         bool playing = IsPlaying;
         double position = seek ?? PositionMs;
         if (playing) Check(Bass.ChannelPause(tempo), "pause before seek");
+        // EOF is a transport position, not a seekable sample: BASS rejects byte offset == length (error 7).
+        // Keep a valid paused graph so Play can rebuild at zero and seeks/settings still work afterwards.
+        if (position >= DurationMs)
+        {
+            change?.Invoke();
+            pausedMs = DurationMs; started = false;
+            return;
+        }
         FreeGraph(); // Rebuild flushes all mixer and tempo lookahead, including click tails.
         change?.Invoke();
         BuildGraph(position);
@@ -139,7 +147,8 @@ public sealed class PlaybackEngine : IPlaybackEngine
             long bytes = Bass.ChannelGetLength(song);
             if (bytes < 0) throw Error("read song length");
             DurationMs = Bass.ChannelBytes2Seconds(song, bytes) * 1000;
-            long seekBytes = Bass.ChannelSeconds2Bytes(song, position / 1000);
+            long seekBytes = Math.Clamp(Bass.ChannelSeconds2Bytes(song, position / 1000), 0,
+                Math.Max(0, bytes - sizeof(float) * info.Channels));
             Check(Bass.ChannelSetPosition(song, seekBytes), "seek song");
             startMs = pausedMs = Bass.ChannelBytes2Seconds(song, Bass.ChannelGetPosition(song)) * 1000;
             clickFrame = ClickSchedule.SampleAt(startMs, rate);

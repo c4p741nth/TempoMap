@@ -13,6 +13,7 @@ public class TimingTableTests
             "498,428.571428571429,4,1,1,40,1,0\r\n21069,-52.6315789473684,4,1,1,40,0,0\r\n21122,500,4,1,1,40,1,0\r\n" +
             "21122,-1000,4,1,1,40,0,0\r\n30000,400,4,2,1,60,1,8\r\n40000,-100,4,3,2,70,0,1\r\n50000,375,3,0,0,60,1,0\r\n");
         var vm = new EditorViewModel(_ => Task.FromResult(AudioContent.Create(new double[1000], 1000)), _ => new ViewModelTests.FakePlayback());
+        vm.AutoNormalizeSv = true; // This table fixture exercises generated normalization rows.
         await vm.LoadAsync(path);
         Assert.Equal("All", vm.TableTabs[vm.TableTab]);
         // The red line first where a green one shares its time, as osu! orders them.

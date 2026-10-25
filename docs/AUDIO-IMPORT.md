@@ -8,7 +8,7 @@ approximately 192 kb/s for stereo; the file's measured average bitrate is not a 
 [Audacity Ogg options](https://manual.audacityteam.org/man/ogg_vorbis_export_options.html) and
 [FFmpeg libvorbis options](https://ffmpeg.org/ffmpeg-codecs.html#libvorbis).
 
-Both `ffmpeg` and `ffprobe` must be beside Tempomap.exe or available on PATH. They are installed on the development
+Both `ffmpeg` and `ffprobe` must be beside TempoMap.exe or available on PATH. They are installed on the development
 machine. No new NuGet packages or FFmpeg binaries were added to the repository/package. Missing tools give an
 actionable open error; the editor does not silently load the unconverted original. Redistribution of external
 executables and their licences remains a packaging decision for a future release.
@@ -19,14 +19,14 @@ executables and their licences remains a packaging decision for a future release
   sidecar; changing its contents creates another sidecar. Sources remain untouched.
 - Existing q6 Oggs pass through. For untagged files, Vorbis's nominal bitrate is the compatibility signal:
   192000 for stereo or 110000 for mono. This does not prove the historical encoder's exact quality setting;
-  the setting is not generally recoverable from an arbitrary Vorbis file. An explicit Tempomap q6 tag identifies
+  the setting is not generally recoverable from an arbitrary Vorbis file. An explicit TempoMap q6 tag identifies
   our own outputs, including other rates/channel counts. Other files are converted conservatively.
 - Conversion writes a unique staged Ogg, probes it, then moves it into a free final name. Failure/cancel removes
   only that staged file. Closing while converting kills the encoder child.
 - The converted path is used for waveform, analysis and playback. Save .osu writes its relative AudioFilename.
 
 The existing Copy button/Ctrl+C exports selected timing rows with fixed **-33 ms**, including greens. Ctrl+Shift+C
-copies all rows. Internal clipboard data retains the source times so Ctrl+C/V within Tempomap creates duplicates
+copies all rows. Internal clipboard data retains the source times so Ctrl+C/V within TempoMap creates duplicates
 at the same times. Orange overlap markers identify red/red or green/green collisions; a red and green at the
 same time is normal. Undo/redo includes pasted greens. For duplicate reds, the first controls playback and beat snap.
 

@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia;
 using Avalonia.VisualTree;
+using Avalonia.Styling;
 using TimingAnalyzer.Audio;
 using TimingAnalyzer.Editor;
 using TimingAnalyzer.Core;
@@ -54,6 +55,7 @@ public partial class MainWindow : Window
         // A new proposal shows its apply buttons even when the toolbars are scrolled or taller than their room.
         model.PropertyChanged += (_, e) =>
         {
+            if (e.PropertyName == nameof(EditorViewModel.SelectedTheme)) ApplyTheme();
             if (e.PropertyName == nameof(EditorViewModel.SelectedIndices))
             {
                 // A selection made elsewhere (waveform box, Esc, follow) replaces the table's green rows too.
@@ -66,7 +68,7 @@ public partial class MainWindow : Window
     }
     // Both kinds of point can be selected and edited; tempo tools still use the red selection.
     private bool syncingTable, syncQueued, savingPointFields;
-    private static readonly DataFormat<string> InternalTimingFormat = DataFormat.CreateStringApplicationFormat("Tempomap.TimingPoints.v1");
+    private static readonly DataFormat<string> InternalTimingFormat = DataFormat.CreateStringApplicationFormat("TempoMap.TimingPoints.v1");
     private void TableSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (syncingTable || savingPointFields) return;
@@ -84,6 +86,23 @@ public partial class MainWindow : Window
             model.JumpTo(row.Point.Time);
     }
     private void SelectAllRows(object? sender, RoutedEventArgs e) => TimingTable.SelectAll();
+    private void FocusTempoFactor(object? sender, RoutedEventArgs e)
+    {
+        TempoFactorBox.BringIntoView(); TempoFactorBox.Focus(); TempoFactorBox.SelectAll();
+    }
+    private void ApplyTempoFactor(object? sender, RoutedEventArgs e) => model.ApplyTempoFactor();
+    private async void ShowToolGuide(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new Window { Title = "คู่มือเครื่องมือ TempoMap", Width = Math.Min(680, Width - 40),
+            Height = Math.Min(620, Height - 40), WindowStartupLocation = WindowStartupLocation.CenterOwner, Icon = Icon };
+        var close = new Button { Content = "ปิด", HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
+        var panel = new DockPanel { Margin = new Thickness(20) };
+        DockPanel.SetDock(close, Dock.Bottom); panel.Children.Add(close);
+        panel.Children.Add(new ScrollViewer { Content = new TextBlock { Text = ToolGuide.Thai, FontSize = 14,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap }, Margin = new Thickness(0, 0, 0, 12) });
+        dialog.Content = panel; close.Click += (_, _) => dialog.Close(); CloseOnEscape(dialog);
+        await dialog.ShowDialog(this);
+    }
     private void AddPointForTab(object? sender, RoutedEventArgs e)
     {
         if (model.TableTab == 2) AddInheritedPoint(sender, e);
@@ -190,7 +209,8 @@ public partial class MainWindow : Window
             "Ctrl+T: auto-time · Ctrl+Enter: apply the proposal\n" +
             "Ctrl+←/→: shift the selected lines 1 ms (Ctrl+Shift: 5 ms) · Ctrl+↑/↓: tune their BPM by the step in the Shift row (Ctrl+Shift: ten steps)\n" +
             "M: metronome · F: follow · Esc: close this window and the other dialogs\n" +
-            "Ctrl+Shift+C: copy all timing points · Ctrl+Shift+N: copy normalized (osu!mania) · F1: this list" });
+            "Ctrl+Shift+C: copy all timing points · F1: this list · F2: Thai tool guide\n" +
+            "Manual SV keeps values fixed; Auto normalize SV follows red-line changes (the switch is undoable)." });
         panel.Children.Add(new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, Opacity = 0.8, Text =
             "Waveform: red = red line, purple = bar line, gray = beat, dim = beat-snap tick, orange = selected, yellow = playhead, blue band = range, violet band = section worth a listen." });
         panel.Children.Add(close); dialog.Content = panel;
@@ -255,17 +275,29 @@ public partial class MainWindow : Window
         // Written only when it moves, so the layout pass it causes settles instead of looping.
         static void Set(Control c, double value) { if (Math.Abs(c.MaxHeight - value) > 0.5) c.MaxHeight = value; }
         Set(TopScroll, Math.Max(48, MainArea.Bounds.Height - BottomPanel.Bounds.Height - BottomPanel.Margin.Top -
-            TopScroll.Margin.Bottom - SeekBar.Bounds.Height - MinWaveformHeight));
+            TopScroll.Margin.Bottom - SeekBar.Bounds.Height - SeekBar.Margin.Top - SeekBar.Margin.Bottom -
+            WaveformHeader.Bounds.Height - WaveformHeader.Margin.Top - WaveformHeader.Margin.Bottom - 2 - MinWaveformHeight));
         Set(DetailsScroll, Math.Max(48, RightPanel.Bounds.Height - RedLinesTitle.Bounds.Height - RedLinesTitle.Margin.Bottom -
             TableHeader.Bounds.Height - TableHeader.Margin.Bottom - DetailsScroll.Margin.Top - MinListHeight));
     }
     private void ApplySettings(EditorSettings settings)
     {
         model.ApplySettings(settings);
+        ApplyTheme();
         WindowState = WindowState.Normal;
         Width = Math.Max(MinWidth, settings.WindowWidth); Height = Math.Max(MinHeight, settings.WindowHeight);
         normalSize = new Size(Width, Height);
         if (settings.WindowMaximized) WindowState = WindowState.Maximized;
+    }
+    private void ApplyTheme()
+    {
+        if (Application.Current is { } app)
+            app.RequestedThemeVariant = model.SelectedTheme switch
+            {
+                "Light" => ThemeVariant.Light,
+                "Dark" => ThemeVariant.Dark,
+                _ => ThemeVariant.Default
+            };
     }
     private void SaveSettings()
     {
@@ -282,7 +314,7 @@ public partial class MainWindow : Window
     {
         ApplySettings(new EditorSettings());
         SaveSettings();
-        model.ReportError("Settings restored to their defaults (volumes, metronome, follow, speed, beat snap, shift steps, BPM step, auto-time mode and choices, table tab, window size).");
+        model.ReportError("Settings restored to their defaults (volumes, metronome, follow, speed, beat snap, shift steps, BPM step, auto-time mode and choices, table tab, window size and Dark appearance).");
     }
     private static bool InTextBox(KeyEventArgs e) =>
         e.Source is TextBox || e.Source is Visual v && v.GetVisualAncestors().OfType<TextBox>().Any();
@@ -430,7 +462,7 @@ public partial class MainWindow : Window
                 OsuPrecision.FormatTime(point.Time) + " ms, " + OsuPrecision.FormatBpm(point.Bpm) + " BPM? Green lines are preserved.");
             model.ApplyProposal(confirmed);
         }
-        catch (Exception ex) { model.ReportError("Enter a valid proposal offset: " + ex.Message); }
+        catch (Exception ex) { model.ReportError("Enter a valid proposal BPM and offset: " + ex.Message); }
     }
     /// <summary>The release this build is ("20261023.0"), from the App project's InformationalVersion.</summary>
     public static string Version => typeof(MainWindow).Assembly
@@ -468,7 +500,7 @@ public partial class MainWindow : Window
         var yes = new Button { Content = "Replace red lines" };
         var no = new Button { Content = "Cancel" };
         var dialog = new Window { Title = title, Width = 520, SizeToContent = SizeToContent.Height,
-            CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+            CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, Icon = Icon };
         var buttons = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 12 };
         buttons.Children.Add(yes); buttons.Children.Add(no);
         var panel = new StackPanel { Margin = new Thickness(20), Spacing = 16 };
@@ -505,17 +537,6 @@ public partial class MainWindow : Window
         await Clipboard.SetDataAsync(data);
         await Clipboard.FlushAsync();
     }
-    private async void CopyNormalized(object? sender, RoutedEventArgs e)
-    {
-        try
-        {
-            if (Clipboard is null) throw new IOException("Clipboard unavailable.");
-            var (text, summary) = model.NormalizedClipboardText();
-            await WriteTimingClipboard(text);
-            model.ReportError(summary);
-        }
-        catch (Exception ex) { model.ReportError(ex.Message); }
-    }
     private async void SaveOsu(object? sender, RoutedEventArgs e)
     {
         try
@@ -542,8 +563,8 @@ public partial class MainWindow : Window
         if (e.Key == Key.O && ctrl) { _ = Open(!shift); e.Handled = true; }
         else if (e.Key == Key.T && ctrl) { AutoTime(this, new RoutedEventArgs()); e.Handled = true; }
         else if (e.Key == Key.C && ctrl && shift) { CopyTiming(this, new RoutedEventArgs()); e.Handled = true; }
-        else if (e.Key == Key.N && ctrl && shift) { CopyNormalized(this, new RoutedEventArgs()); e.Handled = true; }
         else if (e.Key == Key.F1) { ShowKeys(this, new RoutedEventArgs()); e.Handled = true; }
+        else if (e.Key == Key.F2) { ShowToolGuide(this, new RoutedEventArgs()); e.Handled = true; }
         else if (e.Key == Key.M && plain) { model.ClickEnabled = !model.ClickEnabled; e.Handled = true; }
         else if (e.Key == Key.F && plain) { model.FollowPlayhead = !model.FollowPlayhead; e.Handled = true; }
         else if (e.Key == Key.S && ctrl) { SaveOsu(this, new RoutedEventArgs()); e.Handled = true; }

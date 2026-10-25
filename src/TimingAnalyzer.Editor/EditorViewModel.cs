@@ -59,7 +59,8 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     private AutoTimingProposal? proposal;
     private MultiTimingProposal? multiProposal;
     private string proposalOffsetText = "";
-    public AutoTimingProposal? Proposal { get => proposal; private set { SetProperty(ref proposal, value); OnPropertyChanged(nameof(ProposalDescription)); OnPropertyChanged(nameof(HasProposal)); OnPropertyChanged(nameof(HasSingleProposal)); } }
+    private string proposalBpmText = "";
+    public AutoTimingProposal? Proposal { get => proposal; private set { SetProperty(ref proposal, value); proposalBpmText = value is null ? "" : OsuPrecision.FormatBpm(value.Bpm); OnPropertyChanged(nameof(AnalysisBpmText)); OnPropertyChanged(nameof(ProposalDescription)); OnPropertyChanged(nameof(HasProposal)); OnPropertyChanged(nameof(HasSingleProposal)); } }
     /// <summary>A one-line proposal waits: its offset can be edited before Apply.</summary>
     public bool HasSingleProposal => Proposal is not null;
     /// <summary>The multi-BPM proposal, when one was made. Mutually exclusive with <see cref="Proposal"/>.</summary>
@@ -73,7 +74,33 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public string ProposalOffsetText { get => proposalOffsetText; set => SetProperty(ref proposalOffsetText, value); }
     private string lockedBpmText = "";
     /// <summary>Empty: detect the BPM. A number: lock it, so auto-time fits only the offset.</summary>
-    public string LockedBpmText { get => lockedBpmText; set => SetProperty(ref lockedBpmText, value ?? ""); }
+    public string LockedBpmText { get => lockedBpmText; set { if (SetProperty(ref lockedBpmText, value ?? "")) OnPropertyChanged(nameof(AnalysisBpmText)); } }
+    /// <summary>Typing locks the next analysis as well as editing a pending result; detector-filled values stay automatic.</summary>
+    public string AnalysisBpmText
+    {
+        get => HasSingleProposal ? proposalBpmText : LockedBpmText;
+        set
+        {
+            if (HasSingleProposal) SetProperty(ref proposalBpmText, value ?? "");
+            LockedBpmText = value ?? "";
+        }
+    }
+    private string tempoFactorText = "0.5";
+    public string TempoFactorText { get => tempoFactorText; set => SetProperty(ref tempoFactorText, value); }
+    public bool AutoNormalizeSv
+    {
+        get => Edits.AutoNormalizeSv;
+        set => Run(() =>
+        {
+            if (value == Edits.AutoNormalizeSv) return;
+            double? greenTime = selectedGreenRow?.Point.Time;
+            var visible = Greens.ToArray();
+            Edits.ReplaceTiming(Edits.RedLines, value ? LiveNormalization.FromVisible(visible, Edits.RedLines, NormalizationEnd) : visible, value);
+            if (greenTime is { } time) SelectGreenAt(time);
+            Status = value ? "Auto normalize SV on: green values follow the red grid. Undo restores the previous mode." :
+                "Manual SV: current green values stay fixed when BPM or timing changes. Undo restores the previous mode.";
+        });
+    }
     /// <summary>Drift mode choices: beats per red line (4 = one bar in 4/4; 1 = a red line on every drum hit).</summary>
     /// <summary>
     /// Auto-time modes beside the one Auto-time button: Normal (multi-BPM, which gives the original single red line when
@@ -99,6 +126,14 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public AudioContent? Audio { get; private set; }
     public bool IsBusy { get => busy; private set { SetProperty(ref busy, value); OnPropertyChanged(nameof(CanInteract)); } }
     public bool CanInteract => !IsBusy;
+    public bool HasAudio => Audio is not null;
+    public IReadOnlyList<string> ThemeOptions { get; } = ["Dark", "Light", "System"];
+    private string selectedTheme = "Dark";
+    public string SelectedTheme
+    {
+        get => selectedTheme;
+        set { if (ThemeOptions.Contains(value)) SetProperty(ref selectedTheme, value); }
+    }
     public string Status { get => status; private set => SetProperty(ref status, value); }
     public double DurationMs => Audio?.DurationMs ?? Math.Max(10000, (Edits.RedLines.LastOrDefault()?.Time ?? 0) + 5000);
     public double PositionMs
@@ -169,6 +204,22 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     public string SelectedPointLabel => selectedGreenRow is not null ? "Selected inherited point" : "Selected timing point";
     public string PointValueLabel => selectedGreenRow is not null ? "SV (x)" : "BPM";
     private TimingPoint? FieldPoint => selectedGreenRow?.Point ?? SelectedRow?.Point;
+    public bool KiaiEnabled
+    {
+        get => FieldPoint is { } point && (point.Effects & TimingPoint.Kiai) != 0;
+        set => Run(() =>
+        {
+            if (FieldPoint is not { } point || value == ((point.Effects & TimingPoint.Kiai) != 0)) return;
+            var updated = point with { Effects = value ? point.Effects | TimingPoint.Kiai : point.Effects & ~TimingPoint.Kiai };
+            if (selectedGreenRow is { } green)
+            {
+                var visible = InheritedRows.Select(r => r.Point).ToArray(); visible[green.GreenIndex] = updated;
+                ReplaceVisibleGreens(visible); SelectGreenAt(updated.Time);
+            }
+            else { Edits.Update(SelectedRow!.Index, updated); Select(Edits.RedLines.ToList().FindIndex(p => ReferenceEquals(p, updated))); }
+            Status = value ? "Kiai on from this point until the next effect change." : "Kiai off from this point.";
+        });
+    }
     public void SelectTableRows(IEnumerable<TimingRow> rows, TimingRow? primary)
     {
         var chosen = rows.ToArray();
@@ -242,11 +293,13 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         MusicVolumePercent = MusicVolumePercent, ClickVolumePercent = ClickVolumePercent, ClickEnabled = ClickEnabled,
         FollowPlayhead = FollowPlayhead, Speed = SelectedSpeed, SnapDivisor = SnapDivisor, AutoMode = SelectedAutoMode,
         TableTab = TableTab, ShiftBeatDivisor = SelectedShiftBeatStep.Divisor, ShiftMs = SelectedShiftMsStep,
-        BpmStep = SelectedBpmStep, AlignToEdge = AlignToEdge, StartOnBar = StartOnBar,
+        BpmStep = SelectedBpmStep, AlignToEdge = AlignToEdge, StartOnBar = StartOnBar, Theme = SelectedTheme, AutoNormalizeSv = AutoNormalizeSv,
     };
     /// <summary>Applies remembered settings through the same setters as the window, so out-of-range values are ignored.</summary>
     public void ApplySettings(EditorSettings s)
     {
+        SelectedTheme = s.Theme;
+        AutoNormalizeSv = s.AutoNormalizeSv;
         MusicVolumePercent = s.MusicVolumePercent; ClickVolumePercent = s.ClickVolumePercent;
         ClickEnabled = s.ClickEnabled; FollowPlayhead = s.FollowPlayhead;
         if (Speeds.Contains(s.Speed)) SelectedSpeed = s.Speed;
@@ -257,7 +310,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         SelectedBpmStep = s.BpmStep;
         AlignToEdge = s.AlignToEdge; StartOnBar = s.StartOnBar;
     }
-    public IReadOnlyList<string> Speeds { get; } = ["0.5", "0.75", "1.0"];
+    public IReadOnlyList<string> Speeds { get; } = ["0.25", "0.5", "0.75", "1.0"];
     public string SelectedSpeed
     {
         get => selectedSpeed;
@@ -365,7 +418,9 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
             CancelDrag();
             Edits.Changed -= TimingChanged;
             var reds = doc?.TimingPoints.Where(p => p.Uninherited).ToArray() ?? [new TimingPoint(0, 500)];
-            Edits = new(reds, LiveNormalization.FromDocument(reds, doc?.TimingPoints.Where(p => !p.Uninherited) ?? []));
+            bool normalizeSv = AutoNormalizeSv;
+            var loadedGreens = doc?.TimingPoints.Where(p => !p.Uninherited) ?? [];
+            Edits = new(reds, normalizeSv ? LiveNormalization.FromDocument(reds, loadedGreens) : loadedGreens, normalizeSv);
             Edits.Changed += TimingChanged;
             Document = doc; BeatmapPath = doc is null ? null : Path.GetFullPath(path); AudioPath = song; Audio = null;
             Proposal = null; MultiProposal = null; ProposalOffsetText = ""; range = null; rangeAnchor = null; RangeChanged();
@@ -650,6 +705,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         }
         OnPropertyChanged(nameof(SelectedGreenIndices)); OnPropertyChanged(nameof(HasPointSelection));
         OnPropertyChanged(nameof(IsRedPointSelected)); OnPropertyChanged(nameof(SelectedPointLabel)); OnPropertyChanged(nameof(PointValueLabel));
+        OnPropertyChanged(nameof(KiaiEnabled));
         OnPropertyChanged(nameof(SelectedIndices)); OnPropertyChanged(nameof(SelectionLabel));
     }
     private static string FieldTime(TimingPoint point) => point.Uninherited ? OsuPrecision.FormatTime(point.Time) : point.Time.ToString("R", Invariant);
@@ -731,7 +787,9 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         Status = "Red line added at " + OsuPrecision.FormatTime(time) + " ms.";
     });
     private void ReplaceVisibleGreens(IEnumerable<TimingPoint> visible) =>
-        Edits.ReplaceTiming(Edits.RedLines, LiveNormalization.FromVisible(visible, Edits.RedLines, NormalizationEnd));
+        Edits.ReplaceTiming(Edits.RedLines, StoredGreens(visible, Edits.RedLines));
+    private IEnumerable<TimingPoint> StoredGreens(IEnumerable<TimingPoint> visible, IReadOnlyList<TimingPoint> reds) =>
+        AutoNormalizeSv ? LiveNormalization.FromVisible(visible, reds, NormalizationEnd) : visible;
     private void SelectGreenAt(double time)
     {
         int index = InheritedRows.ToList().FindLastIndex(r => r.Point.Time == time);
@@ -758,7 +816,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
             var remove = greenSelection.ToHashSet();
             var visible = InheritedRows.Where(r => !remove.Contains(r.GreenIndex)).Select(r => r.Point).ToArray();
             var reds = Edits.RedLines.Where((_, i) => !selection.Contains(i)).ToArray();
-            Edits.ReplaceTiming(reds, LiveNormalization.FromVisible(visible, reds, NormalizationEnd));
+            Edits.ReplaceTiming(reds, StoredGreens(visible, reds));
             Status = "Selected timing points deleted. Automatic normalization rows remain where needed.";
             return;
         }
@@ -875,9 +933,9 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         var (lines, pasted, replaced, greens) = RangeEdit.Paste(Edits.RedLines, text, replaceAll);
         var visible = NormalizedTiming().Points.Where(p => !p.Uninherited).ToArray();
         // Materialise automatic rows when pasting, so a pasted duplicate remains a distinct row.
-        var existing = Edits.GreenLines.Concat(LiveNormalization.FromVisible(visible.Skip(Edits.GreenLines.Count),
-            Edits.RedLines, NormalizationEnd));
-        var incoming = LiveNormalization.FromVisible(TimingClipboard.Parse(text).Where(p => !p.Uninherited), lines, NormalizationEnd);
+        var existing = AutoNormalizeSv ? Edits.GreenLines.Concat(LiveNormalization.FromVisible(visible.Skip(Edits.GreenLines.Count),
+            Edits.RedLines, NormalizationEnd)) : Edits.GreenLines;
+        var incoming = StoredGreens(TimingClipboard.Parse(text).Where(p => !p.Uninherited), lines);
         Edits.ReplaceTiming(lines, existing.Concat(incoming));
         var indices = Enumerable.Range(0, Edits.RedLines.Count)
             .Where(i => pasted.Any(p => ReferenceEquals(p, Edits.RedLines[i]))).ToArray();
@@ -1064,6 +1122,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         Status = TempoScale.Label(factor) + ": " + (lines.Length == 1 ? "red line at " + OsuPrecision.FormatTime(lines[0].Time) + " ms now " +
             OsuPrecision.FormatBpm(lines[0].Bpm) + " BPM" : Count(lines.Length, "red line") + " rescaled") + ". Ctrl+Z undoes.";
     });
+    public void ApplyTempoFactor() => Run(() => ScaleTempo(double.Parse(TempoFactorText, NumberStyles.Float, Invariant)));
 
     /// <summary>
     /// Fill ramp: a red line on every beat between the selected red lines, the BPM moving in a straight line from one
@@ -1154,7 +1213,13 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         bpm = OsuPrecision.Bpm(value);
         return true;
     }
-    public TimingPoint? ProposalPoint() => Proposal?.AtOffset(ProposalOffsetText);
+    public TimingPoint? ProposalPoint()
+    {
+        if (Proposal is not { } pending) return null;
+        double bpm = double.Parse(AnalysisBpmText, NumberStyles.Float, Invariant);
+        if (!double.IsFinite(bpm) || bpm < 1 || bpm > 1000) throw new ArgumentException("Enter a BPM from 1 to 1000.");
+        return (pending with { Bpm = OsuPrecision.Bpm(bpm) }).AtOffset(ProposalOffsetText);
+    }
     public void ApplyProposal(bool confirmed) => Run(() =>
     {
         if (!confirmed || ProposalPoint() is not { } point) return;
@@ -1275,7 +1340,8 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     private double NormalizationEnd => Audio?.DurationMs ?? Document?.LastObjectTime ?? DurationMs;
     private IEnumerable<TimingPoint> Greens => NormalizedTiming().Points.Where(p => !p.Uninherited).OrderBy(p => p.Time);
     public double MainBpm => NormalizedTiming().MainBpm;
-    public string NormalizationLabel => "Main BPM " + OsuPrecision.FormatBpm(MainBpm) + " · normalized over the whole song";
+    public string NormalizationLabel => AutoNormalizeSv ? "Main BPM " + OsuPrecision.FormatBpm(MainBpm) + " · auto-normalized SV" :
+        "Manual SV · green values stay fixed when red lines change";
 
     /// <summary>
     /// Puts a bar line on the selected red line and counts bars of its meter from there to the end: each later red line
@@ -1300,8 +1366,10 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     /// <summary>Copy for a calibrated osu! setup. Normalize before shifting, so the main BPM uses original song times.</summary>
     public string OsuClipboardText() => OsuTimingExport.Write(NormalizedTiming().Points);
 
-    private ScrollNormalization.Result NormalizedTiming() => normalization ??=
-        LiveNormalization.Build(Edits.RedLines, Edits.GreenLines, NormalizationEnd);
+    private ScrollNormalization.Result NormalizedTiming() => normalization ??= AutoNormalizeSv
+        ? LiveNormalization.Build(Edits.RedLines, Edits.GreenLines, NormalizationEnd)
+        : new(Edits.RedLines.Concat(Edits.GreenLines).ToArray(), Edits.RedLines.Count == 0 ? 120 :
+            60000 / ScrollNormalization.MainBeatLength(Edits.RedLines, NormalizationEnd), null, 0, 0, 0);
 
     /// <summary>
     /// Copy the visible red and green lines, normalized to the BPM held longest over the whole audio.
@@ -1352,6 +1420,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
     {
         normalization = null;
         OnPropertyChanged(nameof(Edits)); OnPropertyChanged(nameof(Audio)); OnPropertyChanged(nameof(Document));
+        OnPropertyChanged(nameof(HasAudio));
         OnPropertyChanged(nameof(SongTitle)); OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(DurationMs)); OnPropertyChanged(nameof(ScrollMaximum));
         OnPropertyChanged(nameof(StartMs)); OnPropertyChanged(nameof(ManualStartMs));
@@ -1359,6 +1428,7 @@ public sealed class EditorViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(TimingRows)); OnPropertyChanged(nameof(InheritedRows)); OnPropertyChanged(nameof(AllRows));
         OnPropertyChanged(nameof(TableRows));
         OnPropertyChanged(nameof(MainBpm)); OnPropertyChanged(nameof(NormalizationLabel));
+        OnPropertyChanged(nameof(AutoNormalizeSv));
     }
     public void ReportError(string message) => Status = message;
     public void Run(Action action)

@@ -16,18 +16,20 @@ public sealed class WaveformControl : Control
     private double? pressX;
     private double boxX;
     private bool boxing, ranging;
-    private static readonly Pen Wave = new(Brushes.Teal), Playhead = new(Brushes.Gold, 2);
-    private static readonly Pen Selected = new(Brushes.OrangeRed, 4);
+    private IBrush background = new SolidColorBrush(Color.Parse("#101B26"));
+    private Pen wave = new(Brushes.Teal), playhead = new(Brushes.Gold, 2), selected = new(Brushes.OrangeRed, 4);
     private static readonly IBrush BoxFill = new SolidColorBrush(Color.FromArgb(48, 255, 140, 0));
     private static readonly Pen BoxEdge = new(new SolidColorBrush(Color.FromArgb(160, 255, 140, 0)));
     private static readonly IBrush RangeFill = new SolidColorBrush(Color.FromArgb(56, 120, 170, 255));
     private static readonly IBrush MarkFill = new SolidColorBrush(Color.FromArgb(40, 200, 90, 255));
     private static readonly Pen RangeEdge = new(new SolidColorBrush(Color.FromArgb(200, 120, 170, 255)));
-    private static readonly Pen[] GridPens = [new(new SolidColorBrush(Color.Parse("#303741"))),
+    private Pen[] gridPens = [new(new SolidColorBrush(Color.Parse("#303741"))),
         new(Brushes.Gray), new(Brushes.MediumPurple), new(Brushes.IndianRed, 2)];
     public WaveformControl()
     {
         Focusable = true; ClipToBounds = true;
+        ActualThemeVariantChanged += (_, _) => UpdatePalette();
+        AttachedToVisualTree += (_, _) => UpdatePalette();
         DataContextChanged += (_, _) =>
         {
             if (model is not null) model.PropertyChanged -= ModelChanged;
@@ -36,11 +38,23 @@ public sealed class WaveformControl : Control
             InvalidateVisual();
         };
     }
+    private void UpdatePalette()
+    {
+        IBrush Brush(string key, IBrush fallback) => this.TryFindResource(key, ActualThemeVariant, out var value) && value is IBrush brush ? brush : fallback;
+        background = Brush("WaveformBackgroundBrush", background);
+        wave = new(Brush("WaveformSignalBrush", wave.Brush!));
+        playhead = new(Brush("WaveformPlayheadBrush", playhead.Brush!), 2);
+        selected = new(Brush("WaveformSelectedBrush", selected.Brush!), 4);
+        string[] keys = ["WaveformSubdivisionBrush", "WaveformBeatBrush", "WaveformMeasureBrush", "WaveformRedBrush"];
+        for (int i = 0; i < keys.Length; i++) gridPens[i] = new(Brush(keys[i], gridPens[i].Brush!), i == 3 ? 2 : 1);
+        InvalidateVisual();
+    }
     private void ModelChanged(object? sender, PropertyChangedEventArgs e) => InvalidateVisual();
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        context.FillRectangle(new SolidColorBrush(Color.Parse("#151A21")), new Rect(Bounds.Size));
+        context.FillRectangle(background, new Rect(Bounds.Size));
+        context.DrawLine(gridPens[0], new(0, Bounds.Height / 2), new(Bounds.Width, Bounds.Height / 2));
         if (model is null || Bounds.Width < 1 || Bounds.Height < 1) return;
         double X(double time) => (time - model.StartMs) * Bounds.Width / model.SpanMs;
         if (model.Audio is { } audio)
@@ -50,7 +64,7 @@ public sealed class WaveformControl : Control
             var peaks = audio.Peaks.Query(a, b, Math.Max(1, (int)Bounds.Width));
             var full = audio.Peaks.Range(0, audio.Peaks.SampleCount);
             double scale = Bounds.Height * 0.4 / Math.Max(1, Math.Max(Math.Abs(full.Min), Math.Abs(full.Max)));
-            for (int i = 0; i < peaks.Length; i++) context.DrawLine(Wave,
+            for (int i = 0; i < peaks.Length; i++) context.DrawLine(wave,
                 new(i, Bounds.Height / 2 - peaks[i].Max * scale), new(i, Bounds.Height / 2 - peaks[i].Min * scale));
         }
         var reds = model.DisplayRedLines;
@@ -60,7 +74,7 @@ public sealed class WaveformControl : Control
         foreach (var line in BeatGrid.Query(reds, model.StartMs, model.StartMs + model.SpanMs, division).Take(5000))
         {
             double x = X(line.Time);
-            context.DrawLine(GridPens[(int)line.Kind], new(x, 0), new(x, Bounds.Height));
+            context.DrawLine(gridPens[(int)line.Kind], new(x, 0), new(x, Bounds.Height));
         }
         // Sections worth a listen (Check sections): a violet band over the section.
         foreach (var mark in model.Marks)
@@ -84,13 +98,13 @@ public sealed class WaveformControl : Control
             context.DrawRectangle(ranging ? RangeEdge : BoxEdge, band);
         }
         double head = X(model.PositionMs);
-        context.DrawLine(Playhead, new(head, 0), new(head, Bounds.Height));
+        context.DrawLine(playhead, new(head, 0), new(head, Bounds.Height));
         if (!model.IsDragging)
             foreach (int i in model.SelectedIndices)
             {
                 if (i >= model.Edits.RedLines.Count) continue;
                 double x = X(model.Edits.RedLines[i].Time);
-                context.DrawLine(Selected, new(x, 0), new(x, Bounds.Height));
+                context.DrawLine(selected, new(x, 0), new(x, Bounds.Height));
             }
     }
     protected override void OnPointerPressed(PointerPressedEventArgs e)

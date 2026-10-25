@@ -92,7 +92,7 @@ public sealed class AudioImport(string? ffmpeg = null, string? ffprobe = null)
         foreach (string argument in arguments) start.ArgumentList.Add(argument);
         using var process = new Process { StartInfo = start };
         try { process.Start(); }
-        catch (Win32Exception ex) { throw new IOException("Audio import needs ffmpeg and ffprobe beside Tempomap.exe or on PATH. " + ex.Message, ex); }
+        catch (Win32Exception ex) { throw new IOException("Audio import needs ffmpeg and ffprobe beside TempoMap.exe or on PATH. " + ex.Message, ex); }
         var output = process.StandardOutput.ReadToEndAsync(cancellation);
         var errors = process.StandardError.ReadToEndAsync(cancellation);
         try { await process.WaitForExitAsync(cancellation).ConfigureAwait(false); }

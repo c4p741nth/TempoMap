@@ -28,13 +28,13 @@ def create(folder):
     audio = folder / "reference.wav"
     sf.write(audio, reference_audio(), 44100, subtype="PCM_16")
     beatmap = ("osu file format v14\r\n\r\n[General]\r\nAudioFilename: reference.wav\r\nMode: 0\r\n\r\n"
-               "[Metadata]\r\nTitle:Audio calibration\r\nArtist:Tempomap\r\nCreator:Tempomap\r\nVersion:120 BPM\r\n\r\n"
+               "[Metadata]\r\nTitle:Audio calibration\r\nArtist:TempoMap\r\nCreator:TempoMap\r\nVersion:120 BPM\r\n\r\n"
                "[Difficulty]\r\nHPDrainRate:5\r\nCircleSize:4\r\nOverallDifficulty:5\r\nSliderMultiplier:1.4\r\nSliderTickRate:1\r\n\r\n"
                "[Events]\r\n\r\n[TimingPoints]\r\n1000,500,4,1,0,100,1,0\r\n\r\n"
                "[HitObjects]\r\n256,192,23500,1,0,0:0:0:0:\r\n")
-    name = "Tempomap - Audio calibration (Tempomap) [120 BPM].osu"
+    name = "TempoMap - Audio calibration (TempoMap) [120 BPM].osu"
     (folder / name).write_bytes(beatmap.encode("utf-8"))
-    package = folder / "Tempomap-audio-calibration.osz"
+    package = folder / "TempoMap-audio-calibration.osz"
     with zipfile.ZipFile(package, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.write(audio, audio.name)
         archive.writestr(name, beatmap)

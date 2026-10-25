@@ -1,6 +1,6 @@
-Tempomap {version} - timing editor for osu! by C4P741N
+TempoMap {version} - timing editor for osu! by C4P741N
 
-For Windows (x64). MIT license. Run Tempomap.exe; no .NET install is needed.
+For Windows (x64). MIT license. Run TempoMap.exe; no .NET install is needed.
 
 - Open audio or an .osu (File menu, or drop it on the window), press Auto-time (Normal suits almost every song), review, then Apply...
 - Auto-time puts its red lines on the leading edge of the hit in the waveform (about 18 ms after the onset peak the original

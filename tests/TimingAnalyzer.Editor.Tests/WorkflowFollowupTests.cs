@@ -48,6 +48,7 @@ public class WorkflowFollowupTests
         {
             using var vm = new EditorViewModel(_ => Task.FromResult(AudioContent.Create(new double[20000], 1000)),
                 _ => new ViewModelTests.FakePlayback());
+            vm.AutoNormalizeSv = true;
             await vm.LoadAsync(song);
             vm.Edits.Replace([new(0, 500), new(4000, 250)]);
             Assert.Equal(2, vm.InheritedRows.Count);
@@ -61,6 +62,7 @@ public class WorkflowFollowupTests
     public void PasteDuplicatesInsteadOfReplacingAndUndoRestoresTheOriginalRows()
     {
         using var vm = new EditorViewModel(_ => throw new InvalidOperationException(), _ => new ViewModelTests.FakePlayback());
+        vm.AutoNormalizeSv = true;
         vm.Edits.Replace([new(1000, 500), new(6000, 250)]);
         var before = vm.ClipboardText();
         vm.Paste("1000,500,4,1,0,100,1,0\r\n1000,-100,4,1,0,100,0,0\r\n");

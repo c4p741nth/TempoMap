@@ -4,7 +4,7 @@ namespace TimingAnalyzer.Editor;
 
 /// <summary>
 /// What the editor remembers between runs (volumes, metronome, follow, speed, beat snap, shift steps, auto-time mode,
-/// table tab, window size), as JSON in the user's application data. A missing or broken file gives the defaults.
+/// table tab, window size and appearance), as JSON in the user's application data. A missing or broken file gives the defaults.
 /// </summary>
 public sealed record EditorSettings
 {
@@ -29,10 +29,12 @@ public sealed record EditorSettings
     public double WindowWidth { get; init; } = 1280;
     public double WindowHeight { get; init; } = 720;
     public bool WindowMaximized { get; init; }
+    public string Theme { get; init; } = "Dark";
+    public bool AutoNormalizeSv { get; init; }
 
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 
-    /// <summary>%APPDATA%\Tempomap\settings.json.</summary>
+    /// <summary>%APPDATA%\TempoMap\settings.json.</summary>
     public static string DefaultPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         AppInfo.Name, "settings.json");
 

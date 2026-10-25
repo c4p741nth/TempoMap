@@ -1,6 +1,6 @@
 # Agent instructions
 
-This repo is **Tempomap** (named Redline until 2026-10-18), a timing editor for osu! by C4P741N (MIT). It started by
+This repo is **TempoMap** (named Redline until 2026-10-18), a timing editor for osu! by C4P741N (MIT). It started by
 rebuilding TimingAnlyz 0.32.4, an osu! BPM/offset detector. The GitHub account that hosted it was suspended on
 2026-10-18; the local branches `history-main` / `history-full` keep the pre-release history (see docs/PHASE1-STATUS.md
 E34). Test fixtures are synthetic (`tools/make_fixtures.py`): never commit someone else's beatmap.

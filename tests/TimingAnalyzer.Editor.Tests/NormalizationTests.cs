@@ -131,6 +131,7 @@ public class NormalizationTests
         File.WriteAllText(path, "osu file format v14\r\n\r\n[General]\r\nAudioFilename: audio.ogg\r\nMode: 3\r\n\r\n[TimingPoints]\r\n" +
             timing + "\r\n[HitObjects]\r\n" + hitObjects);
         var vm = new EditorViewModel(_ => Task.FromResult(AudioContent.Create(new double[300000], 1000)), _ => new ViewModelTests.FakePlayback());
+        vm.AutoNormalizeSv = true;
         await vm.LoadAsync(path);
         return vm;
     }

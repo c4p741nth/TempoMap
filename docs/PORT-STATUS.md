@@ -28,19 +28,28 @@ Status values: `todo`, `in-progress`, `done`, `blocked`.
 
 ## Last stop
 
-E49 (2026-10-25): rebuilt E48 into the standard Release path after confirming the user closed the old App.
-App build 0 warnings/errors; App/Editor SHA256 match the verified E48 preview. C# 282/282 pass.
-Removed 8 generated duplicate-output targets, 457 files, 998,587,067 logical bytes; no tracked files,
-workspace escapes or reparse points. Normal exe/model/native DLLs verified after cleanup.
+E54 (2026-10-25): TempoMap casing is consistent in the current app/EXE, metadata, release/packaging templates
+and active guides. README now introduces the product and routes users to focused docs. User explicitly chose
+PR-only CI: PRs into develop/main build/test, PRs into main also package; no extra develop push CI.
+Main PR checks stay because they test the merge result. Release still validates/packages its actual main commit.
 
 - When: 2026-10-25
 - Who (executor/model): Codex
-- Status/commit: T1-T6 remain done; E45-E49 uncommitted on base 821a2f6 as previously requested.
-- Stopped because: normal rebuild and cleanup complete. No product-code, engine, package or version changes.
-- Next step: `src/TimingAnalyzer.App/bin/Release/net10.0/win-x64/Tempomap.exe`.
-  Preview/scratch compiled copies are removed; validation sources/results remain. E48 UI checks remain 132 + 81
-  (not rerun for this cleanup). Manual listening/acceptance and portable FFmpeg packaging remain separate.
-  No git mutation or network git action. Evidence: `.dotnet-home/e49-rebuild/`.
+- Status/commit: E50-E54 uncommitted on base 567dcc8; no git state mutation/network action.
+- Validation: normal Release 0 warnings/errors; C# 293 passed, Python 10 passed,
+  headless MainWindow 56 checks (Skia, shared bitmap/casing and E52 Auto-time reruns/Apply).
+  Exact normal filenames and EXE ProductName/FileDescription are TempoMap; normal/tested DLL hashes match.
+  49 local Markdown links and 77 active text files audited; all icon frames match.
+  PowerShell scripts parse. Byte-exact .osu CRLF preserved: whitespace check uses cr-at-eol plus all normal checks.
+- Next step: `src/TimingAnalyzer.App/bin/Release/net10.0/win-x64/TempoMap.exe`.
+  User already confirmed Explorer's mint icon. Desktop shortcut resolves to this file on Windows; its stored
+  target spelling remains historical after COM normalization, so the attempted edit was restored byte-exact.
+  CI event matrix/conditions reviewed locally; no YAML parser package added and no remote Actions run or package
+  created. Changes take effect on GitHub after the user pushes. Manual checklist: 129 unchecked.
+  E52 compiled scratch still awaits cleanup after earlier policy rejection; this task reused its UI output.
+- Evidence: `.dotnet-home/branding-20261025/verified.json`, final-tests, python-tests.log, ui-final.log,
+  observed-checks.json, EXE metadata/native icon extractions; E50-E53 evidence retained. No version/package/Core/
+  reference/reverse changes, release or server operations.
 
 ## Phase 1 editor follow-up
 

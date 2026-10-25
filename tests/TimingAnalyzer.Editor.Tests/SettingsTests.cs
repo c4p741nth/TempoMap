@@ -14,15 +14,20 @@ public class SettingsTests
         var vm = NewModel();
         vm.MusicVolumePercent = 40; vm.ClickVolumePercent = 25; vm.ClickEnabled = false; vm.FollowPlayhead = false;
         vm.SelectedSpeed = "0.75"; vm.SelectedSnap = vm.SnapOptions.First(o => o.Divisor == 8);
-        vm.SelectedAutoMode = "Drift 1 beat"; vm.TableTab = 2;
+        vm.SelectedAutoMode = "Drift 1 beat"; vm.TableTab = 2; vm.SelectedTheme = "Light";
+        vm.AutoNormalizeSv = true;
         vm.SelectedShiftBeatStep = vm.ShiftBeatSteps.First(o => o.Divisor == 32); vm.SelectedShiftMsStep = 5;
-        string path = Path.Combine(Directory.CreateTempSubdirectory().FullName, "Tempomap", "settings.json");
+        string path = Path.Combine(Directory.CreateTempSubdirectory().FullName, "TempoMap", "settings.json");
         vm.CaptureSettings(new EditorSettings { WindowWidth = 1500, WindowHeight = 900, WindowMaximized = true }).Save(path);
 
         var loaded = EditorSettings.Load(path);
+        Assert.Equal("Light", loaded.Theme);
+        Assert.True(loaded.AutoNormalizeSv);
         Assert.Equal((1500.0, 900.0, true), (loaded.WindowWidth, loaded.WindowHeight, loaded.WindowMaximized));
         var other = NewModel();
         other.ApplySettings(loaded);
+        Assert.Equal("Light", other.SelectedTheme);
+        Assert.True(other.AutoNormalizeSv);
         Assert.Equal((40.0, 25.0, false, false), (other.MusicVolumePercent, other.ClickVolumePercent, other.ClickEnabled, other.FollowPlayhead));
         Assert.Equal(("0.75", 8, "Drift 1 beat", 2), (other.SelectedSpeed, other.SnapDivisor, other.SelectedAutoMode, other.TableTab));
         Assert.Equal((32, 5), (other.SelectedShiftBeatStep.Divisor, other.SelectedShiftMsStep));
@@ -32,10 +37,15 @@ public class SettingsTests
         File.WriteAllText(path, "{ not json");
         Assert.Equal(new EditorSettings(), EditorSettings.Load(path));
         other.ApplySettings(new EditorSettings { Speed = "9.9", SnapDivisor = 10, AutoMode = "Drift 7 beats", MusicVolumePercent = 400, TableTab = 9,
-            ShiftBeatDivisor = 3, ShiftMs = 7 });
+            ShiftBeatDivisor = 3, ShiftMs = 7, Theme = "invalid-theme" });
+        Assert.Equal("Light", other.SelectedTheme);
         Assert.Equal(("0.75", 8, "Drift 1 beat", 100.0, 2), (other.SelectedSpeed, other.SnapDivisor, other.SelectedAutoMode, other.MusicVolumePercent, other.TableTab));
         Assert.Equal((32, 5), (other.SelectedShiftBeatStep.Divisor, other.SelectedShiftMsStep));
         other.ApplySettings(new EditorSettings());
+        Assert.Equal("Dark", other.SelectedTheme);
+        Assert.False(other.AutoNormalizeSv);
+        File.WriteAllText(path, "{\"MusicVolumePercent\":35}");
+        Assert.Equal("Dark", EditorSettings.Load(path).Theme); // Existing settings predate appearance choices.
         Assert.Equal((100.0, 70.0, true, true, "1.0", 4, "Normal", 0),
             (other.MusicVolumePercent, other.ClickVolumePercent, other.ClickEnabled, other.FollowPlayhead, other.SelectedSpeed, other.SnapDivisor, other.SelectedAutoMode, other.TableTab));
         Assert.Equal((4, 1), (other.SelectedShiftBeatStep.Divisor, other.SelectedShiftMsStep));

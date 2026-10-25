@@ -1,7 +1,7 @@
-# Tempomap and osu! stable audio timing
+# TempoMap and osu! stable audio timing
 
 Investigation and calibrated clipboard implementation, 2026-10-25. The reported symptom is a tick that sounds aligned in
-Tempomap but late in the stable editor until the copied red-line offsets are reduced.
+TempoMap but late in the stable editor until the copied red-line offsets are reduced.
 
 ## Current choice for the requested local osu! listening workflow
 
@@ -18,7 +18,7 @@ The earlier shift-0 recommendation preserved the original source-audio timing; t
 
 ## What is established
 
-Tempomap renders metronome samples at each red line's beat positions, in the decoded song's sample timeline.
+TempoMap renders metronome samples at each red line's beat positions, in the decoded song's sample timeline.
 `PlaybackEngine` mixes the song and this click stream **before** BASS_FX tempo processing. Output buffering,
 tempo lookahead and the device therefore delay the combined signal. They do not create a relative tick/music
 delay that should be subtracted from an exported offset. The device-latency subtraction in `PositionMs` affects
@@ -41,7 +41,7 @@ Both decoded synthetic WAV/MP3/OGG pulses and two local real MP3 tracks with flo
 The comparison uses the first ten seconds; the real tracks were decoded for thirty seconds. Tiny PCM differences
 are not a time shift. These are comparisons with the DLL defaults, not a trace of stable's stream creation flags.
 
-Installed stable BASS: **2.4.15.2 (x86)**; Tempomap BASS: **2.4.17.48 (x64)**.
+Installed stable BASS: **2.4.15.2 (x86)**; TempoMap BASS: **2.4.17.48 (x64)**.
 
 | Input | Best shift (samples) | Best shift (ms) | First signal agrees |
 |---|---:|---:|---|
@@ -87,7 +87,7 @@ There is no supported basis here for a universal fixed -18/-20/-25 ms preset.
 
 The separate Copy to osu! button/dialog was removed at the user's request. **Copy, Ctrl+C, Copy all and Copy normalized**
 subtract 33 ms from every red and green row in the public clipboard text. Offset 1000 becomes 967. The clipboard also
-contains a private Tempomap format with the original times: Ctrl+V within Tempomap duplicates those rows at their
+contains a private TempoMap format with the original times: Ctrl+V within TempoMap duplicates those rows at their
 original times. External text is pasted exactly as supplied. The waveform, playback and saved `.osu` keep source times.
 
 Multi-BPM timing now shows normalized green rows directly in Inherited/All. Main BPM is the tempo held longest over
@@ -109,7 +109,7 @@ The generated test uses original synthetic pulses, with no third-party beatmap o
 .venv\Scripts\python.exe tools/osu_audio_calibration.py create artifacts/audio-calibration
 ```
 
-1. Import `artifacts/audio-calibration/Tempomap-audio-calibration.osz` into stable and open its editor's F3 tab.
+1. Import `artifacts/audio-calibration/TempoMap-audio-calibration.osz` into stable and open its editor's F3 tab.
    Keep **120 BPM**, **offset 1000 ms**, **100% speed**, the metronome enabled and Ctrl released.
 2. Record at least ten seconds of **stereo desktop/loopback audio** as WAV or FLAC, with music and effects audible.
    Do not use a microphone, mono downmix or spatial processing. Keep volumes low enough to avoid clipping.
@@ -143,7 +143,7 @@ The user provided a real stereo PCM recording: 24.370 s at 48000 Hz. The initial
 
 The waveform-matching regression was red before the fix (extra tick-only events counted as music) and green afterward. The original and corrected measurement methods choose the same whole-ms shift. The narrow spread describes this recording, not sub-millisecond accuracy guaranteed across sessions.
 
-The user confirmed this capture used **offset 1000 ms**, without the earlier estimated -22 ms correction. A separate synthetic control package at **offset 967 ms** was prepared at `artifacts/audio-calibration/Tempomap-audio-calibration-minus33.osz`. Its audio was verified identical to the original. The predicted residual under a constant-delay model was about 0.417 ms; the actual control result follows.
+The user confirmed this capture used **offset 1000 ms**, without the earlier estimated -22 ms correction. A separate synthetic control package at **offset 967 ms** was prepared at `artifacts/audio-calibration/TempoMap-audio-calibration-minus33.osz`. Its audio was verified identical to the original. The predicted residual under a constant-delay model was about 0.417 ms; the actual control result follows.
 
 ## Corrected-offset recording, same settings
 
@@ -174,7 +174,7 @@ The baseline plus all supplied runs, normalized to the original offset before ta
 
 Files b and c have identical SHA-256 hashes. The user explicitly confirmed they were newly recorded separately, so the table retains both reported acquisition trials and records the identical-data limitation.
 
-The synthetic verification package is `artifacts/audio-calibration/Tempomap-audio-calibration-minus36.osz`, with offset 964 ms and byte-identical reference audio. Its offset and audio hash were checked. This is a measured trial setting for the current setup, not a universal preset. This was a provisional prediction; the actual 964 recordings are analyzed below.
+The synthetic verification package is `artifacts/audio-calibration/TempoMap-audio-calibration-minus36.osz`, with offset 964 ms and byte-identical reference audio. Its offset and audio hash were checked. This is a measured trial setting for the current setup, not a universal preset. This was a provisional prediction; the actual 964 recordings are analyzed below.
 
 ## Actual offset 964 controls: median does not show every tick
 
@@ -189,22 +189,22 @@ The second recording illustrates the percentile limitation: its early ticks fall
 
 **Do not keep subtracting the median from the map offset:** some ticks are already early. The earlier -36 ms trial is not validated as a complete correction. Playback scheduling in blocks is a possible mechanism, but the stable implementation, capture path and focus effects have not been isolated; no exact internal root cause is claimed.
 
-Next control: pause osu! audio and open the original synthetic `.osu` from `artifacts/audio-calibration/` in Tempomap. Keep its red line at 1000 ms, playback speed 1.0 and metronome enabled; do not run Auto-time. Record stereo loopback with Tempomap foreground and the same recording setup. Measure that capture to compare the combined-PCM playback path with the osu! captures. The control was subsequently provided; see the comparison below.
+Next control: pause osu! audio and open the original synthetic `.osu` from `artifacts/audio-calibration/` in TempoMap. Keep its red line at 1000 ms, playback speed 1.0 and metronome enabled; do not run Auto-time. Record stereo loopback with TempoMap foreground and the same recording setup. Measure that capture to compare the combined-PCM playback path with the osu! captures. The control was subsequently provided; see the comparison below.
 
-## Tempomap player control at original offset 1000 / 120 BPM
+## TempoMap player control at original offset 1000 / 120 BPM
 
-The user supplied `tm_1000.wav` for the original synthetic timing in Tempomap. The same measurement method gives:
+The user supplied `tm_1000.wav` for the original synthetic timing in TempoMap. The same measurement method gives:
 
 | Player / recording | Offset (ms) | Pairs | Median delay (ms) | Minimum (ms) | Maximum (ms) |
 |---|---:|---:|---:|---:|---:|
-| Tempomap | 1000 | 42 | -0.021 | -0.042 | -0.021 |
+| TempoMap | 1000 | 42 | -0.021 | -0.042 | -0.021 |
 | osu stable baseline | 1000 | 42 | 33.417 | 33.417 | 33.417 |
 | osu stable 964a | 964 | 42 | 3.417 | -6.604 | 3.417 |
 | osu stable 964b | 964 | 42 | 2.417 | -7.583 | 2.417 |
 
-Tempomap has a 0.021 ms within-recording span and nearest whole-ms correction 0. The recorded tick and reference are aligned to the measurement resolution; no 10 ms steps appear in this control. This agrees with the source graph: music and clicks are mixed on one sample timeline before output.
+TempoMap has a 0.021 ms within-recording span and nearest whole-ms correction 0. The recorded tick and reference are aligned to the measurement resolution; no 10 ms steps appear in this control. This agrees with the source graph: music and clicks are mixed on one sample timeline before output.
 
-**Conclusion for this comparison:** the capture/measurement setup can resolve a locked music/tick pair, and Tempomap playback at the manually set reference timing is aligned. The delay/steps in the supplied osu! captures belong to that playback/sample path under the tested conditions. The exact stable clock, tick sample attack and scheduling implementation have not been isolated, so neither a specific DLL bug nor a universal stable compensation value is claimed. This control does not validate Auto-time on unrelated songs.
+**Conclusion for this comparison:** the capture/measurement setup can resolve a locked music/tick pair, and TempoMap playback at the manually set reference timing is aligned. The delay/steps in the supplied osu! captures belong to that playback/sample path under the tested conditions. The exact stable clock, tick sample attack and scheduling implementation have not been isolated, so neither a specific DLL bug nor a universal stable compensation value is claimed. This control does not validate Auto-time on unrelated songs.
 
 **Preserving source timing:** Save .osu and internal clipboard data keep the original times. The user's requested public clipboard text applies -33 ms for local osu! listening; it does not edit the source grid. For osu!'s per-device calibration, its [Offset Wizard](https://osu.ppy.sh/wiki/en/Guides/How_to_use_the_Offset_Wizard) remains separate. A constant shift cannot remove the observed variable timing steps. No osu! setting or user map was changed by this investigation.
 

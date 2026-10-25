@@ -21,11 +21,11 @@ Nothing open. T1-T6 done, parity 45/45 (rechecked 2026-10-18).
 
 ## Phase 1 editor (`PHASE1-STATUS.md`, `EDITOR-MANUAL-TEST.md`)
 
-- [ ] **Run the manual checklist** in `EDITOR-MANUAL-TEST.md` (116 unchecked items): audio/click sync at 1.0 and
+- [ ] **Run the manual checklist** in `EDITOR-MANUAL-TEST.md` (129 unchecked items): audio/click sync at 1.0 and
   0.75, drag feel, volume response, follow, save into osu! and reopen in the osu! editor, and the new Phase 3
   section (duplicate red lines, drift mode on Billie Jean). Only a person at the speakers can do these.
 - [ ] Listen for crackles with the unbuffered output (E18); fallback is a small buffer.
-- [x] Synthetic playback comparison recorded: Tempomap at offset 1000/120 BPM stays within 0.05 ms; osu! controls
+- [x] Synthetic playback comparison recorded: TempoMap at offset 1000/120 BPM stays within 0.05 ms; osu! controls
   show delay and timing steps. At the user's request, the existing Copy/Ctrl+C now subtracts 33 ms externally;
   internal paste/Save retain source times. No further capture is required for this request.
   See `OSU-AUDIO-TIMING.md` (E45). Real-song listening/paste checks remain in the manual checklist.
@@ -33,8 +33,15 @@ Nothing open. T1-T6 done, parity 45/45 (rechecked 2026-10-18).
   paste with overlap markers and undo; 1/64 shifts; automatic adjacent Ogg q6 conversion (E46, `AUDIO-IMPORT.md`).
 - [x] Point-edit workflow: Ctrl+P focuses BPM, Ctrl+G adds green everywhere, tab-aware +/Insert, Enter/blur saves,
   fixed +/minus/move buttons, dedicated Auto-time result row and seek start/end controls (E48).
+- [x] Modern workspace surfaces, adaptive waveform colors and remembered Dark/Light/System appearance (E50).
+- [x] Inline BPM/Offset/Apply, percentages, 0.25 speed, waveform app icon, point actions after Meter, green Kiai,
+  custom BPM multiply, optional auto SV, EOF seek/replay fix and Thai tool guide/menu cleanup (E51).
+- [x] Typing over a previous BPM result locks Auto-time reruns to that BPM; fit only offset, and clear the
+  field to resume automatic BPM detection (E52).
+- [x] Shared header/native logo and Explorer refresh (E53); consistent TempoMap casing/EXE, concise README,
+  focused docs and PR-only CI with main packaging preview (E54).
 - [ ] Before a portable release, decide how to supply/licence external ffmpeg/ffprobe tools; current imports use PATH
-  or executables beside Tempomap. No third-party binary was bundled in this task.
+  or executables beside TempoMap. No third-party binary was bundled in this task.
 
 ## Auto-time on songs like ReCreate of the Red (2026-10-23, E43-E44 in `PHASE1-STATUS.md`)
 
