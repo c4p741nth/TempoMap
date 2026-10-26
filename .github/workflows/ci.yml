@@ -1,6 +1,7 @@
 name: CI
 
-# Pull requests into develop/main build and test the merge result. PRs into main also check packaging.
+# Pull requests into develop/main build and test the merge result. PRs into main also check packaging and that the
+# version is new (a release needs a raised version: tools/bump-version.ps1).
 # There is no develop push run: an open develop -> main PR already covers that update. Nothing is published here.
 on:
   pull_request:
@@ -14,6 +15,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version:
+    # Only the pull request that will release: its version must be new. Without this a merge into main with the old
+    # version builds nothing and says so only in a notice (release.yml), which is easy to miss.
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Version is new
+        shell: pwsh
+        run: |
+          [xml] $xml = Get-Content -Raw src/TimingAnalyzer.App/TimingAnalyzer.App.csproj
+          $info = $xml.SelectSingleNode('//InformationalVersion').InnerText.Trim()
+          $version = $xml.SelectSingleNode('//Version').InnerText.Trim()
+          $tag = "v$info"
+          $fix = "Run 'pwsh tools/bump-version.ps1' on develop and push the commit."
+          if ($info -notmatch '^(\d{4})(\d{2})(\d{2})\.(\d+)$') {
+            Write-Host "::error title=Version::InformationalVersion '$info' is not YYYYMMDD.n. $fix"
+            exit 1
+          }
+          $expected = '{0}.{1}.{2}.{3}' -f [int] $Matches[1], [int] $Matches[2], [int] $Matches[3], [int] $Matches[4]
+          if ($version -ne $expected) {
+            Write-Host "::error title=Version::Version '$version' does not match InformationalVersion '$info' (it should be '$expected'). $fix"
+            exit 1
+          }
+          # Same test as release.yml. This token only reads, so it sees published releases and tags but not a draft.
+          $known = @(gh release list --limit 200 --json tagName --jq '.[].tagName')
+          gh api "repos/$env:GITHUB_REPOSITORY/git/ref/tags/$tag" *> $null
+          $tagExists = ($LASTEXITCODE -eq 0)
+          if ($known -contains $tag -or $tagExists) {
+            Write-Host "::error title=Version already released::$tag already has a release or a tag, so merging this into main would release nothing. $fix"
+            exit 1
+          }
+          Write-Host "$tag is new."
+          exit 0
+
   build-test:
     runs-on: windows-latest
     timeout-minutes: 30

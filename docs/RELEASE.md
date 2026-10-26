@@ -1,7 +1,8 @@
 # Branches, CI and releases
 
 How a change gets from a branch to a release on GitHub. The files behind it: `.github/workflows/ci.yml`,
-`.github/workflows/release.yml`, `.github/dependabot.yml`, `tools/package-release.ps1`, `tools/release/`.
+`.github/workflows/release.yml`, `.github/dependabot.yml`, `tools/bump-version.ps1`, `tools/package-release.ps1`,
+`tools/release/`.
 
 ## The flow
 
@@ -11,12 +12,16 @@ feature branch ──PR──▶ develop ──PR──▶ main ──(release.y
 
 1. **Work on a branch, open a pull request into `develop`.** `ci.yml` builds and tests it (Windows runner, .NET 10).
 2. **Merge into `develop`.** No extra push CI runs. An open `develop` -> `main` pull request tests the updated merge result.
-3. **When `develop` is ready to release, bump the version in a commit on `develop`:** `Version` (`2026.10.23.0`) and
-   `InformationalVersion` (`20261023.0`) in `src/TimingAnalyzer.App/TimingAnalyzer.App.csproj`, which must say the same
-   date and number (`YYYYMMDD.n`, the n-th release that day; `Version` has no leading zeros). The tag is `v` + the
-   InformationalVersion. The packaging script refuses a mismatch.
+3. **When `develop` is ready to release, bump the version in a commit on `develop`:** run `pwsh tools/bump-version.ps1`
+   (`-WhatIf` shows what it would do). It sets `Version` (`2026.10.23.0`) and `InformationalVersion` (`20261023.0`) in
+   `src/TimingAnalyzer.App/TimingAnalyzer.App.csproj` to today's date and the first number not yet used by a tag or a
+   release (`YYYYMMDD.n`, the n-th release that day; `Version` has no leading zeros), so the two always agree. The tag is
+   `v` + the InformationalVersion. The packaging script refuses a mismatch. Nothing bumps it for you on merge: the
+   check in step 4 is what stops a release that forgot.
 4. **Open a pull request from `develop` into `main`.** CI builds, tests and, for this pull request only, builds the
-   release zip too (kept as a workflow artifact for 7 days), so a packaging problem shows before the merge.
+   release zip too (kept as a workflow artifact for 7 days), so a packaging problem shows before the merge. The
+   **version** check fails the pull request if `v<InformationalVersion>` is already a release or a tag (or Version and
+   InformationalVersion disagree): run the script again and push.
 5. **Merge it.** `release.yml` runs on the push to `main`: it builds, tests, packages, attests the zip and creates a
    **draft pre-release** `vYYYYMMDD.n` with the zip, its `.sha256` and notes (what it is, the SHA-256, how to verify it,
    and the pull requests merged since the last release).
@@ -24,15 +29,17 @@ feature branch ──PR──▶ develop ──PR──▶ main ──(release.y
    once it has been listened to). Nothing is public before that.
 
 A push to `main` whose version already has a release, a draft or a tag builds nothing: the run only says
-"raise Version and InformationalVersion to release again". So a docs-only merge into `main` is harmless.
+"raise Version and InformationalVersion to release again". The version check on the pull request is there so that
+does not happen by surprise; the one thing it cannot see is a **draft** (a read-only token does not list drafts, and a
+draft has no tag yet), so publish or delete a draft before the next release of the same version.
 
 ## Which checks run
 
-| Event | Build and test | Package preview |
-| --- | --- | --- |
-| PR into develop | Runs | Skipped |
-| PR into main | Runs on the merge result | Runs after tests |
-| Push to develop | No CI run | No CI run |
+| Event | Build and test | Package preview | Version check |
+| --- | --- | --- | --- |
+| PR into develop | Runs | Skipped | Skipped |
+| PR into main | Runs on the merge result | Runs after tests | Runs |
+| Push to develop | No CI run | No CI run | No CI run |
 
 The old configuration also ran CI on each develop push. With a develop -> main PR open, that produced both
 `build-test (push)` and `build-test (pull_request)` for the same update. The push trigger has been removed.
@@ -63,7 +70,7 @@ Change what a release carries in the script and its README template, not by hand
 ## One-time setup on GitHub
 
 - **Branches:** create `develop` from `main`. Settings → Rules → Rulesets: for `main` and `develop` require a pull request
-  before merging, require the status check **CI / build-test** (and **CI / package** for `main`), and block force
+  before merging, require the status check **CI / build-test** (and **CI / package** and **CI / version** for `main`), and block force
   pushes. Whoever merges can be you; the rule is there so nothing reaches `main` without CI.
 - **Actions:** Settings → Actions → General → Workflow permissions can stay at *Read repository contents*;
   `release.yml` asks for what it needs in the workflow itself (`contents: write` to make the draft, and
