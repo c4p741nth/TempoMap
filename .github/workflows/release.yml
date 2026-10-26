@@ -53,8 +53,7 @@ jobs:
       - uses: actions/setup-dotnet@v6
         if: steps.version.outputs.release == 'true'
         with:
-          # Exact version on purpose: see ci.yml (10.0.x resolves through aka.ms, which is failing with HTTP 409).
-          dotnet-version: 10.0.403
+          dotnet-version: 10.0.x
 
       - name: Build and test
         if: steps.version.outputs.release == 'true'
