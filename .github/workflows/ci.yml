@@ -62,9 +62,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          # Exact version on purpose: 10.0.x makes dotnet-install resolve through aka.ms, which redirects to
-          # dotnetorigin.blob.core.windows.net (HTTP 409 since 2026-10-25). An exact version uses builds.dotnet.microsoft.com.
-          dotnet-version: 10.0.403
+          dotnet-version: 10.0.x
 
       - name: Restore
         run: dotnet restore
@@ -88,9 +86,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          # Exact version on purpose: 10.0.x makes dotnet-install resolve through aka.ms, which redirects to
-          # dotnetorigin.blob.core.windows.net (HTTP 409 since 2026-10-25). An exact version uses builds.dotnet.microsoft.com.
-          dotnet-version: 10.0.403
+          dotnet-version: 10.0.x
 
       - name: Package
         id: package

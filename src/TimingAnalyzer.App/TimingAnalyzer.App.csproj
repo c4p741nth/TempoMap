@@ -13,8 +13,8 @@
     <!-- The .exe's icon in Explorer and the taskbar; the window uses the same file as an Avalonia resource. -->
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <!-- Release version vYYYYMMDD.n (the n-th release that day); the About box shows the informational version. -->
-    <Version>2026.10.26.0</Version>
-    <InformationalVersion>20261026.0</InformationalVersion>
+    <Version>2026.10.26.1</Version>
+    <InformationalVersion>20261026.1</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Authors>C4P741N</Authors>
     <Product>TempoMap</Product>
